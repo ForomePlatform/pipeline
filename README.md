@@ -1,2 +1,2 @@
 # pipeline
-Pipeline Workflows
+Pipeline WDL Workflows
