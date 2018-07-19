@@ -4,6 +4,7 @@ workflow wes_upstream
 {
     #RESOURCES SECTION 
     File dbSNP_vcf
+   
     File dbSNP_vcf_idx
     String known_indels_sites_VCF
     String known_indels_sites_idx
