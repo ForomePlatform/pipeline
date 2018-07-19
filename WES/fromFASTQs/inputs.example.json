@@ -1,0 +1,39 @@
+{
+ "wes_upstream.tools"                  : "/path/to/tools",
+ "wes_upstream.bwa_threads"            : "16",
+ "wes_upstream.samtools_threads"       : "16",
+ 
+ "wes_upstream.dbSNP_vcf"              : "/path/to/resources/dbsnp_147.hg19.vcf",
+ "wes_upstream.dbSNP_vcf_idx"          : "/path/to/resources/dbsnp_147.hg19.vcf.idx",
+ "wes_upstream.known_indels_sites_VCF" : "/path/to/resources/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf",
+ "wes_upstream.known_indels_sites_idx" : "/path/to/resources/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.idx",
+ "wes_upstream.ref_fasta"              : "/path/to/resources/hg19.fasta",
+ "wes_upstream.ref_dict"               : "/path/to/resources/hg19.dict",
+ 
+ "wes_upstream.scattered_calling_intervals_list": "/path/to/scatter_intervals",
+
+ "wes_upstream.input_fastqs": { "id1": {
+                                         "Left" : "/path/to/pair1.fastq",
+                                         "Right": "/path/to/pair2.fastq"
+                                       },
+
+                                "id2": {
+                                         "Left" : "/path/to/pair1.fastq",
+                                         "Right": "/path/to/pair2.fastq"
+                                       },
+
+                                "id3": {
+                                         "Left" : "/path/to/pair1.fastq",
+                                         "Right": "/path/to/pair2.fastq"
+                                       },
+
+                                "id4": {
+                                         "Left" : "/path/to/pair1.fastq",
+                                         "Right": "/path/to/pair2.fastq"
+                                       }
+                              },
+ "wes_upstream.base_name"        : "base_name_",
+ "wes_upstream.res_dir"          : "/path/to/results/dir" #should contain folders 'base_name_id1', 'base_name_id2', 'base_name_id3' and 'base_name_id4'
+}
+
+
