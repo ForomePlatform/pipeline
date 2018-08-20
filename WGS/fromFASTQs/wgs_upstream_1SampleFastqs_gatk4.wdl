@@ -127,7 +127,7 @@ workflow wgs
 		     input:
 		       input_bam = MergeBamAlignment.output_bam,
 		       samtools  = tools + "/samtools-1.8/samtools",
-		       pyScript  = tools + "/test.py"
+		       pyScript  = tools + "/fix_rg_header.py"
 		  }
 		
 		  call SortSam_byQuery as sortMergedBam
