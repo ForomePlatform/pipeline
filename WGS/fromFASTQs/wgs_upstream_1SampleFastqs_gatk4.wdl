@@ -1,3 +1,12 @@
+#gatk 4.0.8.1
+#FastqToSam 2.18.9-SNAPSHOT
+#samtools 1.8
+#bwa bwa-0.7.17
+#SortSam 2.18.9-SNAPSHOT
+#MergeBamAlignment 2.18.9-SNAPSHOT
+#2.18.9-SNAPSHOT MarkDuplicates 
+#SetNmAndUqTags 2.18.9-SNAPSHOT
+#sambamba - custom 
 workflow wgs 
 {
       #RESOURCES SECTION
