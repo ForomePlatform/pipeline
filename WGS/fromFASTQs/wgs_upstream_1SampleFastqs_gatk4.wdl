@@ -535,15 +535,15 @@ task SortSam_byQuery
 
   command
   {
-     #java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar ${picard} \
-     #SortSam \
-     #INPUT=${input_bam} \
-     #OUTPUT=${output_bam_basename}.bam \
-     #SORT_ORDER="queryname" \
-     #CREATE_INDEX=true \
-     #CREATE_MD5_FILE=true \
-     #MAX_RECORDS_IN_RAM=800000
-     ${sambamba} sort -m 16G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
+     java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar ${picard} \
+     SortSam \
+     INPUT=${input_bam} \
+     OUTPUT=${output_bam_basename}.bam \
+     SORT_ORDER="queryname" \
+     CREATE_INDEX=true \
+     CREATE_MD5_FILE=true \
+     MAX_RECORDS_IN_RAM=800000
+     #${sambamba} sort -m 16G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
   }
 
   runtime
