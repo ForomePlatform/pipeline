@@ -323,7 +323,7 @@ task GatherBamFiles
 
   command
   {
-    java -Xmx${java_heap_memory} -Xms2000m -XX:ParallelGCThreads=1 -jar ${PICARD} \
+    java -Xmx${java_heap_memory} -Xms2000m -XX:ParallelGCThreads=1 -jar $PICARD \
       GatherBamFiles \
       INPUT=${sep=' INPUT=' input_bams} \
       OUTPUT=${output_bam_basename}.bam \
@@ -361,9 +361,11 @@ task Fastq_to_uBAM
    String sampleName
    String output_uBAM_baseName
 
+   Int disk_size = ceil(size(fastq1, "GB") + size(fastq2, "GB"))
+
    command
    {
-     java -XX:ParallelGCThreads=1 -Xmx8G -jar ${PICARD} FastqToSam \
+     java -XX:ParallelGCThreads=1 -Xmx8G -jar $PICARD FastqToSam \
      FASTQ=${fastq1} \
      FASTQ2=${fastq2} \
      OUTPUT=${output_uBAM_baseName}.bam \
@@ -375,6 +377,7 @@ task Fastq_to_uBAM
 
    runtime
    {
+      docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
       memory: "8 GB"
       cpu: 1
    }
@@ -388,6 +391,7 @@ task Fastq_to_uBAM
 
 
 # Get version of BWA
+# This is not strictly necessary as a separate task
 task GetBwaVersion
 {
 
@@ -404,6 +408,9 @@ task GetBwaVersion
     docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
     cpu: 1
     memory: "3.75 GB"
+    disks: "local-disk 10 HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output 
@@ -504,7 +511,7 @@ task SortSam_byQuery
 
   command
   {
-     java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar ${PICARD} \
+     java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar $PICARD \
      SortSam \
      INPUT=${input_bam} \
      OUTPUT=${output_bam_basename}.bam \
@@ -540,7 +547,7 @@ task MergeBamAlignment
 
    command
    {   
-      java -XX:ParallelGCThreads=2 -Dsamjdk.compression_level=${compressionLvl} -Xms3000m -jar ${PICARD} \
+      java -XX:ParallelGCThreads=2 -Dsamjdk.compression_level=${compressionLvl} -Xms3000m -jar $PICARD \
       MergeBamAlignment \
       VALIDATION_STRINGENCY=SILENT \
       EXPECTED_ORIENTATIONS=FR \
@@ -592,7 +599,7 @@ task MarkDuplicates
 
    command
    {
-      java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar ${PICARD} \
+      java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar $PICARD \
       MarkDuplicates \
       INPUT=${sep=' INPUT=' input_bams} \
       OUTPUT=${output_bam_basename}.bam \
@@ -780,7 +787,7 @@ task FixTags
   
   command
   {
-    java -Xmx${fix_tags_java_heap_memory} -XX:ParallelGCThreads=2 -jar ${PICARD} \
+    java -Xmx${fix_tags_java_heap_memory} -XX:ParallelGCThreads=2 -jar $PICARD \
     SetNmAndUqTags \
     INPUT=${input_bam} \
     OUTPUT=${output_bam_basename}.bam \
@@ -876,7 +883,7 @@ task CollectQualityYieldMetrics
 
   command 
   {
-     java -Xms2000m -jar ${PICARD} \
+     java -Xms2000m -jar $PICARD \
        CollectQualityYieldMetrics \
        INPUT=${input_bam} \
        OQ=true \
@@ -903,7 +910,7 @@ task CollectUnsortedReadgroupBamQualityMetrics
 
    command 
    {
-      java -Xms5000m -jar ${PICARD} \
+      java -Xms5000m -jar $PICARD \
         CollectMultipleMetrics \
         INPUT=${input_bam} \
         OUTPUT=${output_bam_prefix} \
