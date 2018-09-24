@@ -15,9 +15,10 @@ workflow wgs
 	
       String known_indels_sites_VCF
       String known_indels_sites_idx
-      String ref_fasta
-	
+     
+      File ref_fasta
       File ref_dict
+      File ref_index
 	
       #INPUT SECTION
       #File fastq1
@@ -97,7 +98,6 @@ workflow wgs
                samtools_threads     = samtools_threads,
 
                java_heap_memory     = "8000m",
-               memory               = "14 GB",
                cpu                  = bwa_threads
           }
 
@@ -162,14 +162,16 @@ workflow wgs
 	   compressionLvl       = 2,
       }
       
+      # may have to revert this memory to 16GB if the VM seems to be running out of memory
       call SortSam_byCoordinate as MarkDuplicatesOutputSort
       {
          input:
            input_bam = MarkDuplicates.output_bam,
-           memory    = "16G",
+           memory    = "14G",
            cpu       = 16
       }
 	
+      # changed mem and cpus to fit into n1-standard-2 gcloud VM
       call FixTags as FixSampleBam
       {
          input:
@@ -177,9 +179,9 @@ workflow wgs
            input_bam_index           = MarkDuplicatesOutputSort.output_bam_index,
            output_bam_basename       = base_name + "." + sampleName + ".aligned.duplicate_marked.sorted",
            ref_fasta                 = ref_fasta,
-           fix_tags_java_heap_memory = "8000m",
-           memory                    = "8 GB",
-           cpu                       = 1
+           fix_tags_java_heap_memory = "7500m",
+           memory                    = "7.5 GB",
+           cpu                       = 2
       }
 
       scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping)
@@ -222,18 +224,20 @@ workflow wgs
          }
       }
 
+      # increased cpu to 2, memory to 7500MB since this machine type will be coerced anyway (n1-standard-2)
       call GatherBamFiles
       {
          input:
            input_bams          = ApplyBQSR.recalibrated_bam,
            output_bam_basename = base_name + "." + sampleName + ".gathered",
            sampleName          = base_name + sampleName,
-           cpu                 = 1,
+           cpu                 = 2,
            res_dir             = res_dir,
            java_heap_memory    = "6000m",
-           memory              = "6500MB"
+           memory              = "7500MB"
       }
 
+      # increased cpu to 2, memory to 13GB (n1-highmem-2)
       scatter (subInterval in scattered_calling_intervals)
       {
          call HaplotypeCaller
@@ -246,8 +250,8 @@ workflow wgs
               gvcf_basename    = subInterval + ".g",
               ref_fasta        = ref_fasta,
               res_dir          = res_dir + "/" + base_name + sampleName,
-              memory           = "12GB",
-              cpu              = 1
+              memory           = "13GB",
+              cpu              = 2
          }
       }
 
@@ -267,12 +271,15 @@ task HaplotypeCaller
   String interval_list
   Int interval_padding
   String gvcf_basename
-  String ref_fasta
+  File ref_fasta
+  File ref_dict
+  File ref_index
   
   String res_dir
 
   String memory
   Int cpu
+  Int disk_size = ceil(size(input_bam, "GB") + size(ref_fasta, "GB") + 50)
   
   command
   {
@@ -300,8 +307,12 @@ task HaplotypeCaller
 
   runtime
   {
+     docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
      memory: memory
      cpu: cpu
+     disks: "local-disk " + disk_size + " HDD"
+     preemptible: 4
+     noAddress: true
   }
 
   output
@@ -320,6 +331,8 @@ task GatherBamFiles
   String sampleName
   String memory
   Int cpu
+
+  Int disk_size = ceil(size(input_bams[0], "GB")*length(input_bams) + 20)
 
   command
   {
@@ -340,10 +353,15 @@ task GatherBamFiles
       mv ${sampleName}.recal.realign.dedup.bam.bai ${res_dir}
   }
 
+  # n1-standard-2
   runtime
   {
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
     memory: memory
     cpu: cpu
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output
@@ -361,7 +379,7 @@ task Fastq_to_uBAM
    String sampleName
    String output_uBAM_baseName
 
-   Int disk_size = ceil(size(fastq1, "GB") + size(fastq2, "GB"))
+   Int disk_size = ceil(size(fastq1, "GB") + size(fastq2, "GB") + 20)
 
    command
    {
@@ -375,11 +393,15 @@ task Fastq_to_uBAM
      PLATFORM=ILLUMINA
    }
 
+   # n1-highmem-2
    runtime
    {
       docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
-      memory: "8 GB"
-      cpu: 1
+      memory: "13 GB"
+      cpu: 2
+      disks: "local-disk " + disk_size + " HDD"
+      preemptible: 4
+      noAddress: true
    }
 
    output
@@ -428,18 +450,20 @@ task SamToFastqAndBwaMem
   String bwa_commandline
   String output_bam_basename
 
-  String ref_fasta
-  #File ref_fasta_index
-  #File ref_dict
+  File ref_fasta
+  File ref_amb
+  File ref_ann
+  File ref_bwt
+  File ref_pac
+  File ref_sa
 
   Int bwa_threads
   Int samtools_threads
 
   String java_heap_memory
   
-  String memory
   Int cpu 
-  
+  Int disk_size = ceil((size(fastq1, "GB") + size(fastq2, "GB"))*2)
 
   command
   {
@@ -455,9 +479,13 @@ task SamToFastqAndBwaMem
   }
 
   runtime
-  {
-    memory: memory
+  {    
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: "14 GB"
     cpu: cpu
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output 
@@ -509,6 +537,8 @@ task SortSam_byQuery
 
   String flag
 
+  Int disk_size = ceil(size(input_bam, "GB")*2 + 20)
+
   command
   {
      java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar $PICARD \
@@ -522,10 +552,15 @@ task SortSam_byQuery
      #${sambamba} sort -m 16G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
   }
 
+  # n1-highcpu-16
   runtime
   {
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"    
     cpu: cpus
-    memory: "10000 MB"
+    memory: "14.40 GB"
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output
@@ -539,10 +574,14 @@ task MergeBamAlignment
    File alignedBAM
    File uBAM
    String output_bam_basename
-   String ref_fasta
+   File ref_fasta
+   File ref_dict
+   File ref_index
    String bwa_version
    String bwa_mem_commandline
    Int compressionLvl
+
+   Int disk_size = ceil(size(alignedBAM, "GB") + size(uBAM, "GB") + size(ref_fasta, "GB") + 20)
  
 
    command
@@ -579,8 +618,12 @@ task MergeBamAlignment
 
    runtime
    {
+      docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"    
       cpu: 1
-      memory: "3200 MB"
+      memory: "3.75 GB"
+      disks: "local-disk " + disk_size + " HDD"
+      preemptible: 4
+      noAddress: true
    }
 
    output
@@ -597,6 +640,8 @@ task MarkDuplicates
    String metrics_filename
    Int compressionLvl
 
+   Int disk_size = ceil(size(input_bams[0], "GB")*length(input_bams) + 20)
+
    command
    {
       java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar $PICARD \
@@ -612,10 +657,15 @@ task MarkDuplicates
       CREATE_MD5_FILE=true
    }
 
+   # 4200 MB memory requested, must upgrade to n1-standard-2 machine
    runtime
    {
-      cpu: 1
-      memory: "4200 MB"
+      docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"    
+      cpu: 2
+      memory: "7.5 GB"
+      disks: "local-disk " + disk_size + " HDD"
+      preemptible: 4
+      noAddress: true
    }
 
   output
@@ -704,8 +754,10 @@ task BaseRecalibrator
   File known_indels_sites_idx
 
   File ref_dict
-  String ref_fasta
+  File ref_fasta
+  File ref_index
 
+  Int disk_size = ceil(size(input_bam, "GB") + size(dbSNP_vcf, "GB") + size(known_indels_sites_VCF, "GB") + size(ref_fasta, "GB") + 20)
 
   command 
   {
@@ -721,10 +773,16 @@ task BaseRecalibrator
       -known-sites ${known_indels_sites_VCF} \
       -L ${sep=" -L " sequence_group_interval}
   }
+
+  # n1-standard-2
   runtime 
   {
-    memory: "4 GB"
-    cpu: 1
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: "7.5 GB"
+    cpu: 2
+    disks: "local-disk" + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output 
@@ -754,6 +812,8 @@ task SortSam_byCoordinate
    File input_bam
    String memory
    Int cpu
+
+   Int disk_size = ceil(size(input_bam, "GB") + 10)
    
    command
    {
@@ -761,11 +821,15 @@ task SortSam_byCoordinate
       sambamba index a1.marked.sorted.bam
    }
    
-
+   # n1-highcpu-16
    runtime
    {
-     memory: memory
-     cpu: cpu
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: memory
+    cpu: cpu
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
    }
    
    output
@@ -780,10 +844,14 @@ task FixTags
   File input_bam
   File input_bam_index
   String output_bam_basename
-  String ref_fasta
+  File ref_fasta
+  File ref_dict
+  File ref_index
   String fix_tags_java_heap_memory
   String memory
   Int cpu
+
+  Int disk_size = ceil(size(input_bam, "GB") + 20)
   
   command
   {
@@ -798,8 +866,12 @@ task FixTags
 
   runtime
   {
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
     memory: memory
     cpu: cpu
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output
@@ -815,6 +887,8 @@ task GatherBqsrReports
 {
   Array[File] input_bqsr_reports
   String output_report_filename
+
+  Int disk_size = ceil(size(input_bqsr_reports[0], "GB")*length(input_bqsr_reports) + 10)
   
   command
   {
@@ -825,8 +899,12 @@ task GatherBqsrReports
 
   runtime 
   {
-    memory: "3500 MB"
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: "3.75 GB"
     cpu: 1
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output
@@ -837,14 +915,17 @@ task GatherBqsrReports
 
 task ApplyBQSR
 {
-  String input_bam
+  File input_bam
   File input_bam_index
   String output_bam_basename
   File recalibration_report
   Array[String] sequence_group_interval
-  String ref_fasta
+  File ref_fasta
+  File ref_dict
+  File ref_index
  
   Int compression_level
+  Int disk_size = ceil(size(input_bam, "GB")*2 + size(ref_fasta, "GB") + 20)
 
   command 
   {
@@ -864,8 +945,12 @@ task ApplyBQSR
 
   runtime
   {
-    memory: "3500 MB"
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: "3.75 GB"
     cpu: 1
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output
