@@ -55,5 +55,5 @@ RUN wget -P /usr/bin https://github.com/biod/sambamba/releases/download/v0.6.7/s
 	rm /usr/bin/sambamba_v0.6.7_linux.tar.bz2
 
 # Add programs to the PATH
-ENV PATH $PATH:/bwa-0.7.17/:/usr/local/bin/bin:/gatk:
+ENV PATH $PATH:/bwa-0.7.17/:/usr/local/bin/bin:/gatk:/
 ENV PICARD /usr/java/picard.jar
