@@ -19,6 +19,11 @@ workflow wgs
       File ref_fasta
       File ref_dict
       File ref_index
+      File ref_amb
+      File ref_ann
+      File ref_bwt
+      File ref_pac
+      File ref_sa
 	
       #INPUT SECTION
       #File fastq1
@@ -93,6 +98,12 @@ workflow wgs
                bwa_commandline      = bwa_commandline,
                output_bam_basename  = base_name + "." + sampleName + "_" + i + ".unmerged",
                ref_fasta            = ref_fasta,
+               ref_amb              = ref_amb,
+               ref_ann              = ref_ann,
+               ref_bwt              = ref_bwt,
+               ref_pac              = ref_pac,
+               ref_sa               = ref_sa,
+
 
                bwa_threads          = bwa_threads,
                samtools_threads     = samtools_threads,
@@ -117,6 +128,8 @@ workflow wgs
                uBAM                = Fastq_to_uBAM_sort.output_bam,
                output_bam_basename = base_name + "." + sampleName + "_" + i + "merged.aligned",
                ref_fasta           = ref_fasta,
+               ref_dict            = ref_dict,
+               ref_index           = ref_index,
                bwa_version         = GetBwaVersion.version,
                bwa_mem_commandline = bwa_commandline,
                compressionLvl      = 2,
@@ -179,6 +192,8 @@ workflow wgs
            input_bam_index           = MarkDuplicatesOutputSort.output_bam_index,
            output_bam_basename       = base_name + "." + sampleName + ".aligned.duplicate_marked.sorted",
            ref_fasta                 = ref_fasta,
+           ref_dict                  = ref_dict,
+           ref_index                 = ref_index,
            fix_tags_java_heap_memory = "7500m",
            memory                    = "7.5 GB",
            cpu                       = 2
@@ -198,7 +213,8 @@ workflow wgs
               known_indels_sites_VCF        = known_indels_sites_VCF,
               known_indels_sites_idx        = known_indels_sites_idx,
               ref_dict                      = ref_dict,
-              ref_fasta                     = ref_fasta
+              ref_fasta                     = ref_fasta,
+              ref_index                     = ref_index
          }
       }
 
@@ -220,6 +236,8 @@ workflow wgs
               recalibration_report    = GatherBqsrReports.output_bqsr_report,
               sequence_group_interval = subgroup,
               ref_fasta               = ref_fasta,
+              ref_dict                = ref_dict,
+              ref_index               = ref_index,
               compression_level       = 2
          }
       }
@@ -249,6 +267,8 @@ workflow wgs
               interval_padding = 100,
               gvcf_basename    = subInterval + ".g",
               ref_fasta        = ref_fasta,
+              ref_dict         = ref_dict,
+              ref_index        = ref_index,
               res_dir          = res_dir + "/" + base_name + sampleName,
               memory           = "13GB",
               cpu              = 2
@@ -549,7 +569,7 @@ task SortSam_byQuery
      CREATE_INDEX=true \
      CREATE_MD5_FILE=true \
      MAX_RECORDS_IN_RAM=800000
-     #${sambamba} sort -m 16G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
+     #$sambamba sort -m 16G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
   }
 
   # n1-highcpu-16
