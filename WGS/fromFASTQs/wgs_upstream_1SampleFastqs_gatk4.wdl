@@ -13,24 +13,28 @@ workflow wgs
       File dbSNP_vcf
       File dbSNP_vcf_idx
 	
-      String known_indels_sites_VCF
-      String known_indels_sites_idx
+      File known_indels_sites_VCF
+      File known_indels_sites_idx
      
       File ref_fasta
       File ref_dict
       File ref_index
+      File ref_amb
+      File ref_ann
+      File ref_bwt
+      File ref_pac
+      File ref_sa
 	
       #INPUT SECTION
       #File fastq1
       #File fastq2
-	  
-      Array[Pair[File, File]] fastqs
-      String sampleName
+
+	    Map[String, Array[Pair[File, File]]] input_fastqs           #Map that links a sample to the pair of FASTQ files
+  
+#      Array[Pair[File, File]] fastqs
+#      String sampleName
 	  
       String base_name
-	
-      #don't know about -p
-      String bwa_commandline="bwa mem -R '@RG\\tID:" + base_name + sampleName + "\\tPL:ILLUMINA\\tLB:bgm_lib\\tSM:" + base_name + sampleName + "' -K 100000000 -v 3 -t $bwa_threads -Y $bash_ref_fasta"
 	
       File scattered_calling_intervals_list
       Array[String] scattered_calling_intervals = read_lines(scattered_calling_intervals_list)
@@ -39,7 +43,7 @@ workflow wgs
       Int bwa_threads
       Int samtools_threads
 	
-      String res_dir 
+#      String res_dir 
 
       call CreateSequenceGroupingTSV
       {
@@ -49,217 +53,244 @@ workflow wgs
 
       call GetBwaVersion
 	
-      #String key_sampleName         =sampleName
-      #Pair[File, File] value_fastqs = (fastq1, fastq2)
-          
-      scatter(index in range(length(fastqs)))
+      scatter(key_value in input_fastqs)
       {
-          Int i = index
-          Pair[File, File] pair = fastqs[i]
+        #String key_sampleName         =sampleName
+        #Pair[File, File] value_fastqs = (fastq1, fastq2)
+        String sampleName                      = key_value.left
+        Array[Pair[File, File]] fastqs         = key_value.right
 
-          call Fastq_to_uBAM
-          {
-             input:
-               fastq1               = pair.left,
-               fastq2               = pair.right,
-               sampleName           = base_name + sampleName,
-               output_uBAM_baseName = base_name + sampleName + "_" + i + ".u."
-          }
-	  
-          call SortSam_byQuery as Fastq_to_uBAM_sort
-          {
-             input:
-               input_bam           = Fastq_to_uBAM.uBAM,
-               output_bam_basename = "sorted_uBAM" + "_" + i,
-               compressionLvl      = 2,
-               cpus                = 16,
-               flag                = "-n"    
-          }
-	  
-          # QC the unmapped BAM
-          #call CollectQualityYieldMetrics 
-          #{
-          #   input:
-          #     input_bam        = Fastq_to_uBAM.uBAM,
-          #     metrics_filename = base_name + sampleName + "_" + i + ".unmapped.quality_yield_metrics",
-          #     picard           = tools + "/picard.jar"
-	  #}
-	  
-          call SamToFastqAndBwaMem
-          {
-             input:
-               fastq1               = pair.left,
-               fastq2               = pair.right,
-               bwa_commandline      = bwa_commandline,
-               output_bam_basename  = base_name + "." + sampleName + "_" + i + ".unmerged",
-               ref_fasta            = ref_fasta,
+        #don't know about -p
+        String bwa_commandline="bwa mem -R '@RG\\tID:" + base_name + sampleName + "\\tPL:ILLUMINA\\tLB:bgm_lib\\tSM:" + base_name + sampleName + "' -K 100000000 -v 3 -t $bwa_threads -Y $bash_ref_fasta"
+  
 
-               bwa_threads          = bwa_threads,
-               samtools_threads     = samtools_threads,
+        scatter(index in range(length(fastqs)))
+        {
+            Int i = index
+            Pair[File, File] pair = fastqs[i]
 
-               java_heap_memory     = "8000m",
-               cpu                  = bwa_threads
-          }
+            call Fastq_to_uBAM
+            {
+               input:
+                 fastq1               = pair.left,
+                 fastq2               = pair.right,
+                 sampleName           = base_name + sampleName,
+                 output_uBAM_baseName = base_name + sampleName + "_" + i + ".u."
+            }
+  	  
+            call SortSam_byQuery as Fastq_to_uBAM_sort
+            {
+               input:
+                 input_bam           = Fastq_to_uBAM.uBAM,
+                 output_bam_basename = "sorted_uBAM" + "_" + i,
+                 compressionLvl      = 2,
+                 cpus                = 16,
+                 flag                = "-n"    
+            }
+  	  
+            # QC the unmapped BAM
+            #call CollectQualityYieldMetrics 
+            #{
+            #   input:
+            #     input_bam        = Fastq_to_uBAM.uBAM,
+            #     metrics_filename = base_name + sampleName + "_" + i + ".unmapped.quality_yield_metrics",
+            #     picard           = tools + "/picard.jar"
+  	  #}
+  	  
+            call SamToFastqAndBwaMem
+            {
+               input:
+                 fastq1               = pair.left,
+                 fastq2               = pair.right,
+                 bwa_commandline      = bwa_commandline,
+                 output_bam_basename  = base_name + "." + sampleName + "_" + i + ".unmerged",
+                 ref_fasta            = ref_fasta,
+                 ref_amb              = ref_amb,
+                 ref_ann              = ref_ann,
+                 ref_bwt              = ref_bwt,
+                 ref_pac              = ref_pac,
+                 ref_sa               = ref_sa,
 
-          #call SortSam_byQuery as sortAlignedBam
-          #{
-          #   input:
-          #     input_bam           = SamToFastqAndBwaMem.output_bam,
-          #     output_bam_basename = base_name + "." + sampleName + "_" + i + ".sorted.aligned",
-          #     compressionLvl      = 2,
-          #     picard              = tools + "/picard.jar"
-          #}
+                 bwa_threads          = bwa_threads,
+                 samtools_threads     = samtools_threads,
 
-          call MergeBamAlignment
-          {
-             input:
-               alignedBAM          = SamToFastqAndBwaMem.output_bam,
-               uBAM                = Fastq_to_uBAM_sort.output_bam,
-               output_bam_basename = base_name + "." + sampleName + "_" + i + "merged.aligned",
-               ref_fasta           = ref_fasta,
-               bwa_version         = GetBwaVersion.version,
-               bwa_mem_commandline = bwa_commandline,
-               compressionLvl      = 2,
-          }
-	  
-          #call Fix_RG_Header
-          #{
-          #   input:
-          #     input_bam = MergeBamAlignment.output_bam,
-          #     samtools  = tools + "/samtools-1.8/samtools",
-          #     pyScript  = tools + "/test.py"
-          #}
+                 java_heap_memory     = "8000m",
+                 cpu                  = bwa_threads
+            }
 
-          #call SortSam_byQuery as sortMergedBam
-          #{
-          #   input:
-          #     input_bam           = Fix_RG_Header.output_bam,
-          #     output_bam_basename = base_name + "." + sampleName + "_" + i + ".sorted.merged.aligned",
-          #     compressionLvl      = 2,
-          #     picard              = tools + "/picard.jar",
-          #     sambamba            = tools + "/my_sambamba/sambamba",
-          #     cpus                = 16,
-          #     flag                = "-n"	       
-          #}
+            #call SortSam_byQuery as sortAlignedBam
+            #{
+            #   input:
+            #     input_bam           = SamToFastqAndBwaMem.output_bam,
+            #     output_bam_basename = base_name + "." + sampleName + "_" + i + ".sorted.aligned",
+            #     compressionLvl      = 2,
+            #     picard              = tools + "/picard.jar"
+            #}
 
-          #QC the aligned but unsorted readgroup BAM
-          #no reference as the input here is unsorted, providing a reference would cause an error
-          #call CollectUnsortedReadgroupBamQualityMetrics
-          #{
-          #   input:
-          #     input_bam         = Fix_RG_Header.output_bam,
-          #     output_bam_prefix = base_name + "." + sampleName + "_" + i + ".readgroup",
-          #     picard            = tools + "/picard.jar"
-          #}
-      }
-	
-      call MarkDuplicates 
-      {
-         input:
-	   input_bams           = MergeBamAlignment.output_bam,
-	   output_bam_basename  = base_name + "." + sampleName + ".aligned.unsorted.duplicates_marked",
-	   metrics_filename     = base_name + "." + sampleName + ".duplicate_metrics",
-	   compressionLvl       = 2,
-      }
-      
-      # may have to revert this memory to 16GB if the VM seems to be running out of memory
-      call SortSam_byCoordinate as MarkDuplicatesOutputSort
-      {
-         input:
-           input_bam = MarkDuplicates.output_bam,
-           memory    = "14G",
-           cpu       = 16
-      }
-	
-      # changed mem and cpus to fit into n1-standard-2 gcloud VM
-      call FixTags as FixSampleBam
-      {
-         input:
-           input_bam                 = MarkDuplicatesOutputSort.output_bam,
-           input_bam_index           = MarkDuplicatesOutputSort.output_bam_index,
-           output_bam_basename       = base_name + "." + sampleName + ".aligned.duplicate_marked.sorted",
-           ref_fasta                 = ref_fasta,
-           fix_tags_java_heap_memory = "7500m",
-           memory                    = "7.5 GB",
-           cpu                       = 2
-      }
+            call MergeBamAlignment
+            {
+               input:
+                 alignedBAM          = SamToFastqAndBwaMem.output_bam,
+                 uBAM                = Fastq_to_uBAM_sort.output_bam,
+                 output_bam_basename = base_name + "." + sampleName + "_" + i + "merged.aligned",
+                 ref_fasta           = ref_fasta,
+                 ref_dict            = ref_dict,
+                 ref_index           = ref_index,
 
-      scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping)
-      {
-         call BaseRecalibrator 
-         {
-            input:
-              input_bam                     = FixSampleBam.output_bam,
-              input_bam_index               = FixSampleBam.output_bam_index,
-              recalibration_report_filename = base_name + "." + sampleName + ".recal_data.csv",
-              sequence_group_interval       = subgroup,
-              dbSNP_vcf                     = dbSNP_vcf,
-              dbSNP_vcf_idx                 = dbSNP_vcf_idx,
-              known_indels_sites_VCF        = known_indels_sites_VCF,
-              known_indels_sites_idx        = known_indels_sites_idx,
-              ref_dict                      = ref_dict,
-              ref_fasta                     = ref_fasta
-         }
-      }
+                 bwa_version         = GetBwaVersion.version,
+                 bwa_mem_commandline = bwa_commandline,
+                 compressionLvl      = 2,
+            }
+  	  
+            #call Fix_RG_Header
+            #{
+            #   input:
+            #     input_bam = MergeBamAlignment.output_bam,
+            #     samtools  = tools + "/samtools-1.8/samtools",
+            #     pyScript  = tools + "/test.py"
+            #}
 
-      call GatherBqsrReports
-      {
-         input:
-           input_bqsr_reports     = BaseRecalibrator.recalibration_report,
-           output_report_filename = base_name + "." + sampleName + ".recal_data.csv"
-      }
+            #call SortSam_byQuery as sortMergedBam
+            #{
+            #   input:
+            #     input_bam           = Fix_RG_Header.output_bam,
+            #     output_bam_basename = base_name + "." + sampleName + "_" + i + ".sorted.merged.aligned",
+            #     compressionLvl      = 2,
+            #     picard              = tools + "/picard.jar",
+            #     sambamba            = tools + "/my_sambamba/sambamba",
+            #     cpus                = 16,
+            #     flag                = "-n"	       
+            #}
 
-      scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping_with_unmapped)
-      {
-         call ApplyBQSR
-         {
-            input:
-              input_bam               = FixSampleBam.output_bam,
-              input_bam_index         = FixSampleBam.output_bam_index,
-              output_bam_basename     = base_name + "." + sampleName + ".aligned.duplicates_marked.recalibrated",
-              recalibration_report    = GatherBqsrReports.output_bqsr_report,
-              sequence_group_interval = subgroup,
-              ref_fasta               = ref_fasta,
-              compression_level       = 2
-         }
-      }
+            #QC the aligned but unsorted readgroup BAM
+            #no reference as the input here is unsorted, providing a reference would cause an error
+            #call CollectUnsortedReadgroupBamQualityMetrics
+            #{
+            #   input:
+            #     input_bam         = Fix_RG_Header.output_bam,
+            #     output_bam_prefix = base_name + "." + sampleName + "_" + i + ".readgroup",
+            #     picard            = tools + "/picard.jar"
+            #}
+        }
+  	
+        call MarkDuplicates 
+        {
+           input:
+        	   input_bams           = MergeBamAlignment.output_bam,
+  	         output_bam_basename  = base_name + "." + sampleName + ".aligned.unsorted.duplicates_marked",
+  	         metrics_filename     = base_name + "." + sampleName + ".duplicate_metrics",
+  	         compressionLvl       = 2,
+        }
+        
+        # may have to revert this memory to 16GB if the VM seems to be running out of memory
+        call SortSam_byCoordinate as MarkDuplicatesOutputSort
+        {
+           input:
+             input_bam = MarkDuplicates.output_bam,
+             memory    = "14G",
+             cpu       = 16
+        }
+  	
+        # changed mem and cpus to fit into n1-standard-2 gcloud VM
+        call FixTags as FixSampleBam
+        {
+           input:
+             input_bam                 = MarkDuplicatesOutputSort.output_bam,
+             input_bam_index           = MarkDuplicatesOutputSort.output_bam_index,
+             output_bam_basename       = base_name + "." + sampleName + ".aligned.duplicate_marked.sorted",
+             ref_fasta                 = ref_fasta,
+             ref_dict                  = ref_dict,
+             ref_index                 = ref_index,
 
-      # increased cpu to 2, memory to 7500MB since this machine type will be coerced anyway (n1-standard-2)
-      call GatherBamFiles
-      {
-         input:
-           input_bams          = ApplyBQSR.recalibrated_bam,
-           output_bam_basename = base_name + "." + sampleName + ".gathered",
-           sampleName          = base_name + sampleName,
-           cpu                 = 2,
-           res_dir             = res_dir,
-           java_heap_memory    = "6000m",
-           memory              = "7500MB"
-      }
+             fix_tags_java_heap_memory = "7500m",
+             memory                    = "7.5 GB",
+             cpu                       = 2
+        }
 
-      # increased cpu to 2, memory to 13GB (n1-highmem-2)
-      scatter (subInterval in scattered_calling_intervals)
-      {
-         call HaplotypeCaller
-         {
-            input:
-              input_bam        = GatherBamFiles.output_bam,
-              input_bam_index  = GatherBamFiles.output_bam_index,
-              interval_list    = subInterval,
-              interval_padding = 100,
-              gvcf_basename    = subInterval + ".g",
-              ref_fasta        = ref_fasta,
-              res_dir          = res_dir + "/" + base_name + sampleName,
-              memory           = "13GB",
-              cpu              = 2
-         }
+        scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping)
+        {
+           call BaseRecalibrator 
+           {
+              input:
+                input_bam                     = FixSampleBam.output_bam,
+                input_bam_index               = FixSampleBam.output_bam_index,
+                recalibration_report_filename = base_name + "." + sampleName + ".recal_data.csv",
+                sequence_group_interval       = subgroup,
+                dbSNP_vcf                     = dbSNP_vcf,
+                dbSNP_vcf_idx                 = dbSNP_vcf_idx,
+                known_indels_sites_VCF        = known_indels_sites_VCF,
+                known_indels_sites_idx        = known_indels_sites_idx,
+                ref_dict                      = ref_dict,
+                ref_fasta                     = ref_fasta,
+                ref_index                     = ref_index
+           }
+        }
+
+        call GatherBqsrReports
+        {
+           input:
+             input_bqsr_reports     = BaseRecalibrator.recalibration_report,
+             output_report_filename = base_name + "." + sampleName + ".recal_data.csv"
+        }
+
+        scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping_with_unmapped)
+        {
+           call ApplyBQSR
+           {
+              input:
+                input_bam               = FixSampleBam.output_bam,
+                input_bam_index         = FixSampleBam.output_bam_index,
+                output_bam_basename     = base_name + "." + sampleName + ".aligned.duplicates_marked.recalibrated",
+                recalibration_report    = GatherBqsrReports.output_bqsr_report,
+                sequence_group_interval = subgroup,
+                ref_fasta               = ref_fasta,
+                ref_dict                = ref_dict,
+                ref_index               = ref_index,
+
+                compression_level       = 2
+           }
+        }
+
+        # increased cpu to 2, memory to 7500MB since this machine type will be coerced anyway (n1-standard-2)
+        call GatherBamFiles
+        {
+           input:
+             input_bams          = ApplyBQSR.recalibrated_bam,
+             output_bam_basename = base_name + "." + sampleName + ".gathered",
+             sampleName          = base_name + sampleName,
+             cpu                 = 2,
+#             res_dir             = res_dir,
+             java_heap_memory    = "6000m",
+             memory              = "7500MB"
+        }
+
+        # increased cpu to 2, memory to 13GB (n1-highmem-2)
+        scatter (subInterval in scattered_calling_intervals)
+        {
+           call HaplotypeCaller
+           {
+              input:
+                input_bam        = GatherBamFiles.output_bam,
+                input_bam_index  = GatherBamFiles.output_bam_index,
+                interval_list    = subInterval,
+                interval_padding = 100,
+                gvcf_basename    = subInterval + ".g",
+                ref_fasta        = ref_fasta,
+                ref_dict         = ref_dict,
+                ref_index        = ref_index,
+
+#                res_dir          = res_dir + "/" + base_name + sampleName,
+                memory           = "13GB",
+                cpu              = 2
+           }
+        }
       }
 
       output
       {
-         Array[File] gvcfs = HaplotypeCaller.output_gvcf
-         Array[File] gvcfs_idx = HaplotypeCaller.output_gvcf_index
-         Pair[String, Pair[File, File]] sample_bam = (sampleName, (GatherBamFiles.output_bam, GatherBamFiles.output_bam_index))
+         Array[Array[File]] gvcfs = HaplotypeCaller.output_gvcf
+         Array[Array[File]] gvcfs_idx = HaplotypeCaller.output_gvcf_index
+         Pair[Array[String], Pair[Array[File], Array[File]]] sample_bam = (sampleName, (GatherBamFiles.output_bam, GatherBamFiles.output_bam_index))
       } 
 }
 
@@ -275,7 +306,7 @@ task HaplotypeCaller
   File ref_dict
   File ref_index
   
-  String res_dir
+#  String res_dir
 
   String memory
   Int cpu
@@ -300,9 +331,6 @@ task HaplotypeCaller
     cp ${gvcf_basename}.vcf ${gvcf_basename}vcf
     bgzip ${gvcf_basename}vcf
     tabix -p vcf ${gvcf_basename}vcf.gz
-
-    mv ${gvcf_basename}vcf.gz ${res_dir}
-    mv ${gvcf_basename}vcf.gz.tbi ${res_dir}
   }
 
   runtime
@@ -325,7 +353,7 @@ task HaplotypeCaller
 task GatherBamFiles
 {
   Array[File] input_bams
-  String res_dir
+#  String res_dir
   String output_bam_basename
   String java_heap_memory
   String sampleName
@@ -349,8 +377,6 @@ task GatherBamFiles
 
       cp ${output_bam_basename}_fixed.bam ${sampleName}.recal.realign.dedup.bam
       cp ${output_bam_basename}_fixed.bam.bai ${sampleName}.recal.realign.dedup.bam.bai
-      mv ${sampleName}.recal.realign.dedup.bam ${res_dir}
-      mv ${sampleName}.recal.realign.dedup.bam.bai ${res_dir}
   }
 
   # n1-standard-2
@@ -549,7 +575,7 @@ task SortSam_byQuery
      CREATE_INDEX=true \
      CREATE_MD5_FILE=true \
      MAX_RECORDS_IN_RAM=800000
-     #${sambamba} sort -m 16G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
+     #$sambamba sort -m 16G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
   }
 
   # n1-highcpu-16
