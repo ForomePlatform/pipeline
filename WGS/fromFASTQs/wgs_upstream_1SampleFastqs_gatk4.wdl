@@ -12,7 +12,7 @@ workflow wgs
       #RESOURCES SECTION
       File dbSNP_vcf
       File dbSNP_vcf_idx
-  
+	
       File known_indels_sites_VCF
       File known_indels_sites_idx
      
@@ -24,24 +24,25 @@ workflow wgs
       File ref_bwt
       File ref_pac
       File ref_sa
-  
+	
       #INPUT SECTION
       #File fastq1
       #File fastq2
 
-      Array[Pair[String, Array[Pair[File, File]]]] input_fastqs
+	    Map[String, Array[Pair[File, File]]] input_fastqs           #Map that links a sample to the pair of FASTQ files
+  
 #      Array[Pair[File, File]] fastqs
 #      String sampleName
-    
+	  
       String base_name
-  
+	
       File scattered_calling_intervals_list
       Array[String] scattered_calling_intervals = read_lines(scattered_calling_intervals_list)
-  
+	
       #Optimization flags
       Int bwa_threads
       Int samtools_threads
-  
+	
 #      String res_dir 
 
       call CreateSequenceGroupingTSV
@@ -51,13 +52,13 @@ workflow wgs
       }
 
       call GetBwaVersion
-  
-      scatter(input_sample in input_fastqs)
+	
+      scatter(key_value in input_fastqs)
       {
         #String key_sampleName         =sampleName
         #Pair[File, File] value_fastqs = (fastq1, fastq2)
-        String sampleName                      = input_sample.left
-        Array[Pair[File, File]] fastqs         = input_sample.right
+        String sampleName                      = key_value.left
+        Array[Pair[File, File]] fastqs         = key_value.right
 
         #don't know about -p
         String bwa_commandline="bwa mem -R '@RG\\tID:" + base_name + sampleName + "\\tPL:ILLUMINA\\tLB:bgm_lib\\tSM:" + base_name + sampleName + "' -K 100000000 -v 3 -t $bwa_threads -Y $bash_ref_fasta"
@@ -76,7 +77,7 @@ workflow wgs
                  sampleName           = base_name + sampleName,
                  output_uBAM_baseName = base_name + sampleName + "_" + i + ".u."
             }
-      
+  	  
             call SortSam_byQuery as Fastq_to_uBAM_sort
             {
                input:
@@ -86,7 +87,7 @@ workflow wgs
                  cpus                = 16,
                  flag                = "-n"    
             }
-      
+  	  
             # QC the unmapped BAM
             #call CollectQualityYieldMetrics 
             #{
@@ -94,8 +95,8 @@ workflow wgs
             #     input_bam        = Fastq_to_uBAM.uBAM,
             #     metrics_filename = base_name + sampleName + "_" + i + ".unmapped.quality_yield_metrics",
             #     picard           = tools + "/picard.jar"
-      #}
-      
+  	  #}
+  	  
             call SamToFastqAndBwaMem
             {
                input:
@@ -140,7 +141,7 @@ workflow wgs
                  bwa_mem_commandline = bwa_commandline,
                  compressionLvl      = 2,
             }
-      
+  	  
             #call Fix_RG_Header
             #{
             #   input:
@@ -158,7 +159,7 @@ workflow wgs
             #     picard              = tools + "/picard.jar",
             #     sambamba            = tools + "/my_sambamba/sambamba",
             #     cpus                = 16,
-            #     flag                = "-n"         
+            #     flag                = "-n"	       
             #}
 
             #QC the aligned but unsorted readgroup BAM
@@ -171,14 +172,14 @@ workflow wgs
             #     picard            = tools + "/picard.jar"
             #}
         }
-    
+  	
         call MarkDuplicates 
         {
            input:
-             input_bams           = MergeBamAlignment.output_bam,
-             output_bam_basename  = base_name + "." + sampleName + ".aligned.unsorted.duplicates_marked",
-             metrics_filename     = base_name + "." + sampleName + ".duplicate_metrics",
-             compressionLvl       = 2,
+        	   input_bams           = MergeBamAlignment.output_bam,
+  	         output_bam_basename  = base_name + "." + sampleName + ".aligned.unsorted.duplicates_marked",
+  	         metrics_filename     = base_name + "." + sampleName + ".duplicate_metrics",
+  	         compressionLvl       = 2,
         }
         
         # may have to revert this memory to 16GB if the VM seems to be running out of memory
@@ -189,7 +190,7 @@ workflow wgs
              memory    = "14G",
              cpu       = 16
         }
-    
+  	
         # changed mem and cpus to fit into n1-standard-2 gcloud VM
         call FixTags as FixSampleBam
         {
