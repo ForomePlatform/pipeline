@@ -43,6 +43,8 @@ workflow wgs
       #Optimization flags
       Int bwa_threads
       Int samtools_threads
+  
+      String res_dir 
 
       call CreateSequenceGroupingTSV
       {
@@ -248,6 +250,7 @@ workflow wgs
            output_bam_basename = base_name + "." + sampleName + ".gathered",
            sampleName          = base_name + sampleName,
            cpu                 = 2,
+           res_dir             = res_dir,
            java_heap_memory    = "6000m",
            memory              = "7500MB"
       }
@@ -267,58 +270,18 @@ workflow wgs
             ref_fasta        = ref_fasta,
             ref_dict         = ref_dict,
             ref_index        = ref_index,
+            res_dir          = res_dir + "/" + base_name + sampleName,
             memory           = "13GB",
             cpu              = 2
         }
       }
 
-      call MergeVCFs
-      {
-          input:
-            gvcfs = HaplotypeCaller.output_gvcf,
-            gvcf_indices = HaplotypeCaller.output_gvcf_index,
-            output_name = base_name + "_" + sampleName
-      }
-
       output
       {
-         File gvcf = MergeVCFs.output_gvcf
-         File gvcf_index = MergeVCFs.output_gvcf_index
+         Array[File] gvcfs = HaplotypeCaller.output_gvcf
+         Array[File] gvcfs_idx = HaplotypeCaller.output_gvcf_index
          Pair[String, Pair[File, File]] sample_bam = (sampleName, (GatherBamFiles.output_bam, GatherBamFiles.output_bam_index))
       } 
-}
-
-task MergeVCFs 
-{
-  Array[File] gvcfs
-  Array[File] gvcf_indices
-  String output_name
-
-  Int disk_size = ceil(size(gvcfs[0], "GB")*length(gvcfs)*2 + 20)
-
-  command
-  {
-    java -jar $PICARD \
-      MergeVcfs \
-      INPUT=${sep=' INPUT=' gvcfs} \
-      OUTPUT=${output_name}.vcf
-  }
-
-  runtime
-  {
-     docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
-     memory: "3.75 GB"
-     cpu: 1
-     disks: "local-disk " + disk_size + " HDD"
-     preemptible: 4
-     noAddress: true
-  }
-  
-  output
-  {
-    File output_gvcf = "${output_name}.vcf"
-    File output_gvcf_index = "${output_name}.vcf.idx"
-  }
 }
 
 
@@ -332,6 +295,8 @@ task HaplotypeCaller
   File ref_fasta
   File ref_dict
   File ref_index
+  
+  String res_dir
 
   String memory
   Int cpu
@@ -356,6 +321,9 @@ task HaplotypeCaller
     cp ${gvcf_basename}.vcf ${gvcf_basename}vcf
     bgzip ${gvcf_basename}vcf
     tabix -p vcf ${gvcf_basename}vcf.gz
+
+#    mv ${gvcf_basename}vcf.gz ${res_dir}
+#    mv ${gvcf_basename}vcf.gz.tbi ${res_dir}
   }
 
   runtime
@@ -370,14 +338,15 @@ task HaplotypeCaller
 
   output
   {
-     File output_gvcf = "${gvcf_basename}vcf.gz"
-     File output_gvcf_index = "${gvcf_basename}vcf.gz.tbi"
+     File output_gvcf = "${gvcf_basename}.vcf"
+     File output_gvcf_index = "${gvcf_basename}.vcf.idx"
   }
 }
 
 task GatherBamFiles
 {
   Array[File] input_bams
+  String res_dir
   String output_bam_basename
   String java_heap_memory
   String sampleName
@@ -399,8 +368,10 @@ task GatherBamFiles
       samtools index ${output_bam_basename}_fixed.bam
 
 
-      mv ${output_bam_basename}_fixed.bam ${sampleName}.recal.realign.dedup.bam
-      mv ${output_bam_basename}_fixed.bam.bai ${sampleName}.recal.realign.dedup.bam.bai
+      cp ${output_bam_basename}_fixed.bam ${sampleName}.recal.realign.dedup.bam
+      cp ${output_bam_basename}_fixed.bam.bai ${sampleName}.recal.realign.dedup.bam.bai
+#      mv ${sampleName}.recal.realign.dedup.bam ${res_dir}
+#      mv ${sampleName}.recal.realign.dedup.bam.bai ${res_dir}
   }
 
   # n1-standard-2
@@ -416,8 +387,8 @@ task GatherBamFiles
 
   output
   {
-    File output_bam       = "${sampleName}.recal.realign.dedup.bam"
-    File output_bam_index = "${sampleName}.recal.realign.dedup.bam.bai"
+    File output_bam       = "${output_bam_basename}_fixed.bam"
+    File output_bam_index = "${output_bam_basename}_fixed.bam.bai"
   }
 }
 
@@ -831,7 +802,7 @@ task BaseRecalibrator
     docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
     memory: "7.5 GB"
     cpu: 2
-    disks: "local-disk " + disk_size + " HDD"
+    disks: "local-disk" + disk_size + " HDD"
     preemptible: 4
     noAddress: true
   }
