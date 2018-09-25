@@ -12,9 +12,9 @@ workflow wgs
       #RESOURCES SECTION
       File dbSNP_vcf
       File dbSNP_vcf_idx
-	
-      String known_indels_sites_VCF
-      String known_indels_sites_idx
+  
+      File known_indels_sites_VCF
+      File known_indels_sites_idx
      
       File ref_fasta
       File ref_dict
@@ -24,26 +24,26 @@ workflow wgs
       File ref_bwt
       File ref_pac
       File ref_sa
-	
+  
       #INPUT SECTION
       #File fastq1
       #File fastq2
-	  
+    
       Array[Pair[File, File]] fastqs
       String sampleName
-	  
+    
       String base_name
-	
+  
       #don't know about -p
       String bwa_commandline="bwa mem -R '@RG\\tID:" + base_name + sampleName + "\\tPL:ILLUMINA\\tLB:bgm_lib\\tSM:" + base_name + sampleName + "' -K 100000000 -v 3 -t $bwa_threads -Y $bash_ref_fasta"
-	
+  
       File scattered_calling_intervals_list
-      Array[String] scattered_calling_intervals = read_lines(scattered_calling_intervals_list)
-	
+      Array[File] scattered_calling_intervals = read_lines(scattered_calling_intervals_list)
+  
       #Optimization flags
       Int bwa_threads
       Int samtools_threads
-	
+  
       String res_dir 
 
       call CreateSequenceGroupingTSV
@@ -53,7 +53,7 @@ workflow wgs
       }
 
       call GetBwaVersion
-	
+  
       #String key_sampleName         =sampleName
       #Pair[File, File] value_fastqs = (fastq1, fastq2)
           
@@ -70,7 +70,7 @@ workflow wgs
                sampleName           = base_name + sampleName,
                output_uBAM_baseName = base_name + sampleName + "_" + i + ".u."
           }
-	  
+    
           call SortSam_byQuery as Fastq_to_uBAM_sort
           {
              input:
@@ -80,7 +80,7 @@ workflow wgs
                cpus                = 16,
                flag                = "-n"    
           }
-	  
+    
           # QC the unmapped BAM
           #call CollectQualityYieldMetrics 
           #{
@@ -88,8 +88,8 @@ workflow wgs
           #     input_bam        = Fastq_to_uBAM.uBAM,
           #     metrics_filename = base_name + sampleName + "_" + i + ".unmapped.quality_yield_metrics",
           #     picard           = tools + "/picard.jar"
-	  #}
-	  
+    #}
+    
           call SamToFastqAndBwaMem
           {
              input:
@@ -106,7 +106,7 @@ workflow wgs
 
 
                bwa_threads          = bwa_threads,
-               samtools_threads     = samtools_threads,
+               samtools_threads     = bwa_threads,
 
                java_heap_memory     = "8000m",
                cpu                  = bwa_threads
@@ -134,7 +134,7 @@ workflow wgs
                bwa_mem_commandline = bwa_commandline,
                compressionLvl      = 2,
           }
-	  
+    
           #call Fix_RG_Header
           #{
           #   input:
@@ -152,7 +152,7 @@ workflow wgs
           #     picard              = tools + "/picard.jar",
           #     sambamba            = tools + "/my_sambamba/sambamba",
           #     cpus                = 16,
-          #     flag                = "-n"	       
+          #     flag                = "-n"         
           #}
 
           #QC the aligned but unsorted readgroup BAM
@@ -165,14 +165,14 @@ workflow wgs
           #     picard            = tools + "/picard.jar"
           #}
       }
-	
+  
       call MarkDuplicates 
       {
          input:
-	   input_bams           = MergeBamAlignment.output_bam,
-	   output_bam_basename  = base_name + "." + sampleName + ".aligned.unsorted.duplicates_marked",
-	   metrics_filename     = base_name + "." + sampleName + ".duplicate_metrics",
-	   compressionLvl       = 2,
+     input_bams           = MergeBamAlignment.output_bam,
+     output_bam_basename  = base_name + "." + sampleName + ".aligned.unsorted.duplicates_marked",
+     metrics_filename     = base_name + "." + sampleName + ".duplicate_metrics",
+     compressionLvl       = 2,
       }
       
       # may have to revert this memory to 16GB if the VM seems to be running out of memory
@@ -183,7 +183,7 @@ workflow wgs
            memory    = "14G",
            cpu       = 16
       }
-	
+  
       # changed mem and cpus to fit into n1-standard-2 gcloud VM
       call FixTags as FixSampleBam
       {
@@ -258,21 +258,22 @@ workflow wgs
       # increased cpu to 2, memory to 13GB (n1-highmem-2)
       scatter (subInterval in scattered_calling_intervals)
       {
-         call HaplotypeCaller
-         {
-            input:
-              input_bam        = GatherBamFiles.output_bam,
-              input_bam_index  = GatherBamFiles.output_bam_index,
-              interval_list    = subInterval,
-              interval_padding = 100,
-              gvcf_basename    = subInterval + ".g",
-              ref_fasta        = ref_fasta,
-              ref_dict         = ref_dict,
-              ref_index        = ref_index,
-              res_dir          = res_dir + "/" + base_name + sampleName,
-              memory           = "13GB",
-              cpu              = 2
-         }
+        String gvcf_basename = sub(sub(subInterval, "gs://gatk-legacy-bundles/b37/scattered_wgs_intervals/scatter-50/", ""), "/scattered.interval_list", "") + ".g"
+        call HaplotypeCaller
+        {
+          input:
+            input_bam        = GatherBamFiles.output_bam,
+            input_bam_index  = GatherBamFiles.output_bam_index,
+            interval_list    = subInterval,
+            interval_padding = 100,
+            gvcf_basename    = gvcf_basename,
+            ref_fasta        = ref_fasta,
+            ref_dict         = ref_dict,
+            ref_index        = ref_index,
+            res_dir          = res_dir + "/" + base_name + sampleName,
+            memory           = "13GB",
+            cpu              = 2
+        }
       }
 
       output
@@ -286,9 +287,9 @@ workflow wgs
 
 task HaplotypeCaller
 { 
-  String input_bam
-  String input_bam_index
-  String interval_list
+  File input_bam
+  File input_bam_index
+  File interval_list
   Int interval_padding
   String gvcf_basename
   File ref_fasta
@@ -321,8 +322,8 @@ task HaplotypeCaller
     bgzip ${gvcf_basename}vcf
     tabix -p vcf ${gvcf_basename}vcf.gz
 
-    mv ${gvcf_basename}vcf.gz ${res_dir}
-    mv ${gvcf_basename}vcf.gz.tbi ${res_dir}
+#    mv ${gvcf_basename}vcf.gz ${res_dir}
+#    mv ${gvcf_basename}vcf.gz.tbi ${res_dir}
   }
 
   runtime
@@ -369,8 +370,8 @@ task GatherBamFiles
 
       cp ${output_bam_basename}_fixed.bam ${sampleName}.recal.realign.dedup.bam
       cp ${output_bam_basename}_fixed.bam.bai ${sampleName}.recal.realign.dedup.bam.bai
-      mv ${sampleName}.recal.realign.dedup.bam ${res_dir}
-      mv ${sampleName}.recal.realign.dedup.bam.bai ${res_dir}
+#      mv ${sampleName}.recal.realign.dedup.bam ${res_dir}
+#      mv ${sampleName}.recal.realign.dedup.bam.bai ${res_dir}
   }
 
   # n1-standard-2
@@ -483,7 +484,7 @@ task SamToFastqAndBwaMem
   String java_heap_memory
   
   Int cpu 
-  Int disk_size = ceil((size(fastq1, "GB") + size(fastq2, "GB"))*2)
+  Int disk_size = ceil((size(fastq1, "GB") + size(fastq2, "GB"))*2 + size(ref_fasta, "GB") + 20)
 
   command
   {
@@ -498,6 +499,7 @@ task SamToFastqAndBwaMem
     samtools view -1 -@ ${samtools_threads} - > ${output_bam_basename}.bam 2>> bwa_err.log
   }
 
+  # this will likely make n1-highcpu-16, depending on the bwa_threads value provided
   runtime
   {    
     docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
