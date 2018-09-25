@@ -258,7 +258,6 @@ workflow wgs
       # increased cpu to 2, memory to 13GB (n1-highmem-2)
       scatter (subInterval in scattered_calling_intervals)
       {
-        String gvcf_basename = sub(sub(subInterval, "gs://gatk-legacy-bundles/b37/scattered_wgs_intervals/scatter-50/", ""), "/scattered.interval_list", "") + ".g"
         call HaplotypeCaller
         {
           input:
@@ -266,7 +265,7 @@ workflow wgs
             input_bam_index  = GatherBamFiles.output_bam_index,
             interval_list    = subInterval,
             interval_padding = 100,
-            gvcf_basename    = gvcf_basename,
+            gvcf_basename    = subInterval + ".g",
             ref_fasta        = ref_fasta,
             ref_dict         = ref_dict,
             ref_index        = ref_index,
@@ -276,14 +275,63 @@ workflow wgs
         }
       }
 
+      call gatherOuts
+      {
+        input:
+          gvcfs = HaplotypeCaller.output_gvcf,
+          gvcf_indices = HaplotypeCaller.output_gvcf_index,
+          out_bam = GatherBamFiles.output_bam,
+          out_bam_index = GatherBamFiles.output_bam_index,
+          res_dir = res_dir,
+          base_name = base_name,
+          sampleName = sampleName
+      }
+
       output
       {
-         Array[File] gvcfs = HaplotypeCaller.output_gvcf
-         Array[File] gvcfs_idx = HaplotypeCaller.output_gvcf_index
-         Pair[String, Pair[File, File]] sample_bam = (sampleName, (GatherBamFiles.output_bam, GatherBamFiles.output_bam_index))
+        File results = gatherOuts.results_out
       } 
 }
 
+task gatherOuts
+{
+  Array[File] gvcfs
+  Array[File] gvcf_indices
+  File out_bam
+  File out_bam_index
+
+  String res_dir
+  String base_name
+  String sampleName
+
+  Int disk_size = ceil((size(gvcfs[0], "GB")*length(gvcfs)*2 + size(out_bam, "GB"))*2)
+
+  command
+  {
+    mkdir -p ${res_dir}/${base_name}_${sampleName}
+
+    mv ${out_bam} ${out_bam_index} ${res_dir}
+
+    mv ${sep=' ' gvcfs} ${sep=' ' gvcf_indices} ${res_dir}/${base_name}_${sampleName}
+
+    tar -zcvf ${res_dir}.tar.gz ${res_dir}
+  }
+
+  runtime
+  {
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: "3.75 GB"
+    cpu: 1
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
+  }
+
+  output
+  {
+    File results_out = "${res_dir}.tar.gz"
+  }
+}
 
 task HaplotypeCaller
 { 
@@ -338,8 +386,8 @@ task HaplotypeCaller
 
   output
   {
-     File output_gvcf = "${gvcf_basename}.vcf"
-     File output_gvcf_index = "${gvcf_basename}.vcf.idx"
+     File output_gvcf = "${gvcf_basename}vcf.gz"
+     File output_gvcf_index = "${gvcf_basename}vcf.gz.tbi"
   }
 }
 
@@ -387,8 +435,8 @@ task GatherBamFiles
 
   output
   {
-    File output_bam       = "${output_bam_basename}_fixed.bam"
-    File output_bam_index = "${output_bam_basename}_fixed.bam.bai"
+    File output_bam       = "${sampleName}.recal.realign.dedup.bam"
+    File output_bam_index = "${sampleName}.recal.realign.dedup.bam.bai"
   }
 }
 
@@ -802,7 +850,7 @@ task BaseRecalibrator
     docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
     memory: "7.5 GB"
     cpu: 2
-    disks: "local-disk" + disk_size + " HDD"
+    disks: "local-disk " + disk_size + " HDD"
     preemptible: 4
     noAddress: true
   }
