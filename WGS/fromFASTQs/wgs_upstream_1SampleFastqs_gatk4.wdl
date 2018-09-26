@@ -337,7 +337,7 @@ task HaplotypeCaller
 { 
   File input_bam
   File input_bam_index
-  File interval_list
+  String interval_list
   Int interval_padding
   String gvcf_basename
   File ref_fasta
