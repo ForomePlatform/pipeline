@@ -12,36 +12,39 @@ workflow wgs
       #RESOURCES SECTION
       File dbSNP_vcf
       File dbSNP_vcf_idx
-	
-      String known_indels_sites_VCF
-      String known_indels_sites_idx
-      String ref_fasta
-	
+  
+      File known_indels_sites_VCF
+      File known_indels_sites_idx
+     
+      File ref_fasta
       File ref_dict
-	
+      File ref_index
+      File ref_amb
+      File ref_ann
+      File ref_bwt
+      File ref_pac
+      File ref_sa
+  
       #INPUT SECTION
       #File fastq1
       #File fastq2
-	  
+    
       Array[Pair[File, File]] fastqs
       String sampleName
-	  
+    
       String base_name
-	
+  
       #don't know about -p
       String bwa_commandline="bwa mem -R '@RG\\tID:" + base_name + sampleName + "\\tPL:ILLUMINA\\tLB:bgm_lib\\tSM:" + base_name + sampleName + "' -K 100000000 -v 3 -t $bwa_threads -Y $bash_ref_fasta"
-	
+  
       File scattered_calling_intervals_list
-      Array[String] scattered_calling_intervals = read_lines(scattered_calling_intervals_list)
-	
+      Array[File] scattered_calling_intervals = read_lines(scattered_calling_intervals_list)
+  
       #Optimization flags
       Int bwa_threads
       Int samtools_threads
-	
-      String tools
-      String res_dir
-      
-      String gatk_version = "4.0.8.1"  
+  
+      String res_dir 
 
       call CreateSequenceGroupingTSV
       {
@@ -50,11 +53,7 @@ workflow wgs
       }
 
       call GetBwaVersion
-      {
-         input:
-	   tools = tools
-      }
-	
+  
       #String key_sampleName         =sampleName
       #Pair[File, File] value_fastqs = (fastq1, fastq2)
           
@@ -66,25 +65,22 @@ workflow wgs
           call Fastq_to_uBAM
           {
              input:
-               tools                = tools,
                fastq1               = pair.left,
                fastq2               = pair.right,
                sampleName           = base_name + sampleName,
                output_uBAM_baseName = base_name + sampleName + "_" + i + ".u."
           }
-	  
+    
           call SortSam_byQuery as Fastq_to_uBAM_sort
           {
              input:
                input_bam           = Fastq_to_uBAM.uBAM,
                output_bam_basename = "sorted_uBAM" + "_" + i,
                compressionLvl      = 2,
-               picard              = tools + "/picard.jar",
-               sambamba            = tools + "/my_sambamba/sambamba",
                cpus                = 16,
                flag                = "-n"    
           }
-	  
+    
           # QC the unmapped BAM
           #call CollectQualityYieldMetrics 
           #{
@@ -92,8 +88,8 @@ workflow wgs
           #     input_bam        = Fastq_to_uBAM.uBAM,
           #     metrics_filename = base_name + sampleName + "_" + i + ".unmapped.quality_yield_metrics",
           #     picard           = tools + "/picard.jar"
-	  #}
-	  
+    #}
+    
           call SamToFastqAndBwaMem
           {
              input:
@@ -102,13 +98,17 @@ workflow wgs
                bwa_commandline      = bwa_commandline,
                output_bam_basename  = base_name + "." + sampleName + "_" + i + ".unmerged",
                ref_fasta            = ref_fasta,
+               ref_amb              = ref_amb,
+               ref_ann              = ref_ann,
+               ref_bwt              = ref_bwt,
+               ref_pac              = ref_pac,
+               ref_sa               = ref_sa,
+
 
                bwa_threads          = bwa_threads,
-               samtools_threads     = samtools_threads,
-               tools                = tools,
+               samtools_threads     = bwa_threads,
 
                java_heap_memory     = "8000m",
-               memory               = "14 GB",
                cpu                  = bwa_threads
           }
 
@@ -128,12 +128,13 @@ workflow wgs
                uBAM                = Fastq_to_uBAM_sort.output_bam,
                output_bam_basename = base_name + "." + sampleName + "_" + i + "merged.aligned",
                ref_fasta           = ref_fasta,
+               ref_dict            = ref_dict,
+               ref_index           = ref_index,
                bwa_version         = GetBwaVersion.version,
                bwa_mem_commandline = bwa_commandline,
                compressionLvl      = 2,
-               picard              = tools + "/picard.jar"
           }
-	  
+    
           #call Fix_RG_Header
           #{
           #   input:
@@ -151,7 +152,7 @@ workflow wgs
           #     picard              = tools + "/picard.jar",
           #     sambamba            = tools + "/my_sambamba/sambamba",
           #     cpus                = 16,
-          #     flag                = "-n"	       
+          #     flag                = "-n"         
           #}
 
           #QC the aligned but unsorted readgroup BAM
@@ -164,26 +165,26 @@ workflow wgs
           #     picard            = tools + "/picard.jar"
           #}
       }
-	
+  
       call MarkDuplicates 
       {
          input:
-	   input_bams           = MergeBamAlignment.output_bam,
-	   output_bam_basename  = base_name + "." + sampleName + ".aligned.unsorted.duplicates_marked",
-	   metrics_filename     = base_name + "." + sampleName + ".duplicate_metrics",
-	   compressionLvl       = 2,
-	   picard               = tools + "/picard.jar"
+     input_bams           = MergeBamAlignment.output_bam,
+     output_bam_basename  = base_name + "." + sampleName + ".aligned.unsorted.duplicates_marked",
+     metrics_filename     = base_name + "." + sampleName + ".duplicate_metrics",
+     compressionLvl       = 2,
       }
       
+      # may have to revert this memory to 16GB if the VM seems to be running out of memory
       call SortSam_byCoordinate as MarkDuplicatesOutputSort
       {
          input:
            input_bam = MarkDuplicates.output_bam,
-           memory    = "16G",
-           cpu       = 16,
-           sambamba  = tools + "/my_sambamba/sambamba"
+           memory    = "14G",
+           cpu       = 16
       }
-	
+  
+      # changed mem and cpus to fit into n1-standard-2 gcloud VM
       call FixTags as FixSampleBam
       {
          input:
@@ -191,10 +192,11 @@ workflow wgs
            input_bam_index           = MarkDuplicatesOutputSort.output_bam_index,
            output_bam_basename       = base_name + "." + sampleName + ".aligned.duplicate_marked.sorted",
            ref_fasta                 = ref_fasta,
-           fix_tags_java_heap_memory = "8000m",
-           memory                    = "8 GB",
-           tools                     = tools,
-           cpu                       = 1
+           ref_dict                  = ref_dict,
+           ref_index                 = ref_index,
+           fix_tags_java_heap_memory = "7500m",
+           memory                    = "7.5 GB",
+           cpu                       = 2
       }
 
       scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping)
@@ -212,7 +214,7 @@ workflow wgs
               known_indels_sites_idx        = known_indels_sites_idx,
               ref_dict                      = ref_dict,
               ref_fasta                     = ref_fasta,
-              gatk_launch                   = tools + "/gatk-" + gatk_version + "/gatk"
+              ref_index                     = ref_index
          }
       }
 
@@ -220,9 +222,7 @@ workflow wgs
       {
          input:
            input_bqsr_reports     = BaseRecalibrator.recalibration_report,
-           output_report_filename = base_name + "." + sampleName + ".recal_data.csv",
-           tools                  = tools,
-           gatk_version           = gatk_version
+           output_report_filename = base_name + "." + sampleName + ".recal_data.csv"
       }
 
       scatter (subgroup in CreateSequenceGroupingTSV.sequence_grouping_with_unmapped)
@@ -236,73 +236,123 @@ workflow wgs
               recalibration_report    = GatherBqsrReports.output_bqsr_report,
               sequence_group_interval = subgroup,
               ref_fasta               = ref_fasta,
-              compression_level       = 2,
-              tools                   = tools,
-              gatk_version            = gatk_version
+              ref_dict                = ref_dict,
+              ref_index               = ref_index,
+              compression_level       = 2
          }
       }
 
+      # increased cpu to 2, memory to 7500MB since this machine type will be coerced anyway (n1-standard-2)
       call GatherBamFiles
       {
          input:
            input_bams          = ApplyBQSR.recalibrated_bam,
            output_bam_basename = base_name + "." + sampleName + ".gathered",
-           tools               = tools,
            sampleName          = base_name + sampleName,
-           cpu                 = 1,
+           cpu                 = 2,
            res_dir             = res_dir,
            java_heap_memory    = "6000m",
-           memory              = "6500MB"
+           memory              = "7500MB"
       }
 
+      # increased cpu to 2, memory to 13GB (n1-highmem-2)
       scatter (subInterval in scattered_calling_intervals)
       {
-         call HaplotypeCaller
-         {
-            input:
-              input_bam        = GatherBamFiles.output_bam,
-              input_bam_index  = GatherBamFiles.output_bam_index,
-              interval_list    = subInterval,
-              interval_padding = 100,
-              gvcf_basename    = subInterval + ".g",
-              ref_fasta        = ref_fasta,
-              res_dir          = res_dir + "/" + base_name + sampleName,
-              tools            = tools,
-              memory           = "12GB",
-              gatk_version     = gatk_version,
-              cpu              = 1
-         }
+        call HaplotypeCaller
+        {
+          input:
+            input_bam        = GatherBamFiles.output_bam,
+            input_bam_index  = GatherBamFiles.output_bam_index,
+            interval_list    = subInterval,
+            interval_padding = 100,
+            gvcf_basename    = subInterval + ".g",
+            ref_fasta        = ref_fasta,
+            ref_dict         = ref_dict,
+            ref_index        = ref_index,
+            res_dir          = res_dir + "/" + base_name + sampleName,
+            memory           = "13GB",
+            cpu              = 2
+        }
+      }
+
+      call gatherOuts
+      {
+        input:
+          gvcfs = HaplotypeCaller.output_gvcf,
+          gvcf_indices = HaplotypeCaller.output_gvcf_index,
+          out_bam = GatherBamFiles.output_bam,
+          out_bam_index = GatherBamFiles.output_bam_index,
+          res_dir = res_dir,
+          base_name = base_name,
+          sampleName = sampleName
       }
 
       output
       {
-         Array[File] gvcfs = HaplotypeCaller.output_gvcf
-         Array[File] gvcfs_idx = HaplotypeCaller.output_gvcf_index
-         Pair[String, Pair[File, File]] sample_bam = (sampleName, (GatherBamFiles.output_bam, GatherBamFiles.output_bam_index))
+        File results = gatherOuts.results_out
       } 
 }
 
+task gatherOuts
+{
+  Array[File] gvcfs
+  Array[File] gvcf_indices
+  File out_bam
+  File out_bam_index
+
+  String res_dir
+  String base_name
+  String sampleName
+
+  Int disk_size = ceil((size(gvcfs[0], "GB")*length(gvcfs)*2 + size(out_bam, "GB"))*2)
+
+  command
+  {
+    mkdir -p ${res_dir}/${base_name}_${sampleName}
+
+    mv ${out_bam} ${out_bam_index} ${res_dir}
+
+    mv ${sep=' ' gvcfs} ${sep=' ' gvcf_indices} ${res_dir}/${base_name}_${sampleName}
+
+    tar -zcvf ${res_dir}.tar.gz ${res_dir}
+  }
+
+  runtime
+  {
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: "3.75 GB"
+    cpu: 1
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
+  }
+
+  output
+  {
+    File results_out = "${res_dir}.tar.gz"
+  }
+}
 
 task HaplotypeCaller
 { 
-  String tools
-  String input_bam
-  String input_bam_index
+  File input_bam
+  File input_bam_index
   String interval_list
   Int interval_padding
   String gvcf_basename
-  String ref_fasta
-  
-  String gatk_version
+  File ref_fasta
+  File ref_dict
+  File ref_index
   
   String res_dir
 
   String memory
   Int cpu
+  Int disk_size = ceil(size(input_bam, "GB") + size(ref_fasta, "GB") + 50)
   
   command
   {
-   ${tools}/gatk-${gatk_version}/gatk --java-options "-Xms8g -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -XX:ParallelGCThreads=2" HaplotypeCaller \
+   gatk --java-options "-Xms8g -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -XX:ParallelGCThreads=2" HaplotypeCaller \
       -R ${ref_fasta} \
       -O ${gvcf_basename}.vcf \
       -I ${input_bam} \
@@ -320,20 +370,24 @@ task HaplotypeCaller
     bgzip ${gvcf_basename}vcf
     tabix -p vcf ${gvcf_basename}vcf.gz
 
-    mv ${gvcf_basename}vcf.gz ${res_dir}
-    mv ${gvcf_basename}vcf.gz.tbi ${res_dir}
+#    mv ${gvcf_basename}vcf.gz ${res_dir}
+#    mv ${gvcf_basename}vcf.gz.tbi ${res_dir}
   }
 
   runtime
   {
+     docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
      memory: memory
      cpu: cpu
+     disks: "local-disk " + disk_size + " HDD"
+     preemptible: 4
+     noAddress: true
   }
 
   output
   {
-     File output_gvcf = "${gvcf_basename}.vcf"
-     File output_gvcf_index = "${gvcf_basename}.vcf.idx"
+     File output_gvcf = "${gvcf_basename}vcf.gz"
+     File output_gvcf_index = "${gvcf_basename}vcf.gz.tbi"
   }
 }
 
@@ -346,37 +400,43 @@ task GatherBamFiles
   String sampleName
   String memory
   Int cpu
-  String tools  
+
+  Int disk_size = ceil(size(input_bams[0], "GB")*length(input_bams) + 20)
 
   command
   {
-    java -Xmx${java_heap_memory} -Xms2000m -XX:ParallelGCThreads=1 -jar ${tools}/picard.jar \
+    java -Xmx${java_heap_memory} -Xms2000m -XX:ParallelGCThreads=1 -jar $PICARD \
       GatherBamFiles \
       INPUT=${sep=' INPUT=' input_bams} \
       OUTPUT=${output_bam_basename}.bam \
       CREATE_INDEX=false \
       CREATE_MD5_FILE=true
 
-      ${tools}/samtools-1.8/samtools view -H ${output_bam_basename}.bam | sed "s/SM:[^\t]*/SM:${sampleName}/g" | samtools reheader - ${output_bam_basename}.bam > ${output_bam_basename}_fixed.bam
-      ${tools}/samtools-1.8/samtools index ${output_bam_basename}_fixed.bam
+      samtools view -H ${output_bam_basename}.bam | sed "s/SM:[^\t]*/SM:${sampleName}/g" | samtools reheader - ${output_bam_basename}.bam > ${output_bam_basename}_fixed.bam
+      samtools index ${output_bam_basename}_fixed.bam
 
 
       cp ${output_bam_basename}_fixed.bam ${sampleName}.recal.realign.dedup.bam
       cp ${output_bam_basename}_fixed.bam.bai ${sampleName}.recal.realign.dedup.bam.bai
-      mv ${sampleName}.recal.realign.dedup.bam ${res_dir}
-      mv ${sampleName}.recal.realign.dedup.bam.bai ${res_dir}
+#      mv ${sampleName}.recal.realign.dedup.bam ${res_dir}
+#      mv ${sampleName}.recal.realign.dedup.bam.bai ${res_dir}
   }
 
+  # n1-standard-2
   runtime
   {
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
     memory: memory
     cpu: cpu
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output
   {
-    File output_bam       = "${output_bam_basename}_fixed.bam"
-    File output_bam_index = "${output_bam_basename}_fixed.bam.bai"
+    File output_bam       = "${sampleName}.recal.realign.dedup.bam"
+    File output_bam_index = "${sampleName}.recal.realign.dedup.bam.bai"
   }
 }
 
@@ -388,11 +448,11 @@ task Fastq_to_uBAM
    String sampleName
    String output_uBAM_baseName
 
-   String tools 
+   Int disk_size = ceil(size(fastq1, "GB") + size(fastq2, "GB") + 20)
 
    command
    {
-     java -XX:ParallelGCThreads=1 -Xmx8G -jar ${tools}/picard.jar FastqToSam \
+     java -XX:ParallelGCThreads=1 -Xmx8G -jar $PICARD FastqToSam \
      FASTQ=${fastq1} \
      FASTQ2=${fastq2} \
      OUTPUT=${output_uBAM_baseName}.bam \
@@ -402,10 +462,15 @@ task Fastq_to_uBAM
      PLATFORM=ILLUMINA
    }
 
+   # n1-highmem-2
    runtime
    {
-      memory: "8 GB"
-      cpu: 1
+      docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+      memory: "13 GB"
+      cpu: 2
+      disks: "local-disk " + disk_size + " HDD"
+      preemptible: 4
+      noAddress: true
    }
 
    output
@@ -417,21 +482,26 @@ task Fastq_to_uBAM
 
 
 # Get version of BWA
+# This is not strictly necessary as a separate task
 task GetBwaVersion
 {
-  String tools
+
   command 
   {
     # Not setting "set -o pipefail" here because /bwa has a rc=1 and we don't want to allow rc=1 to succeed 
     # because the sed may also fail with that error and that is something we actually want to fail on.
-    ${tools}/bwa/bwa-0.7.17/bwa 2>&1 | \
+    bwa 2>&1 | \
     grep -e '^Version' | \
     sed 's/Version: //'
   }
   runtime 
   {
-    memory: "100 MB"
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
     cpu: 1
+    memory: "3.75 GB"
+    disks: "local-disk 10 HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output 
@@ -449,19 +519,20 @@ task SamToFastqAndBwaMem
   String bwa_commandline
   String output_bam_basename
 
-  String ref_fasta
-  #File ref_fasta_index
-  #File ref_dict
+  File ref_fasta
+  File ref_amb
+  File ref_ann
+  File ref_bwt
+  File ref_pac
+  File ref_sa
 
   Int bwa_threads
   Int samtools_threads
 
   String java_heap_memory
-  String tools
   
-  String memory
   Int cpu 
-  
+  Int disk_size = ceil((size(fastq1, "GB") + size(fastq2, "GB"))*2 + size(ref_fasta, "GB") + 20)
 
   command
   {
@@ -472,14 +543,19 @@ task SamToFastqAndBwaMem
     bash_ref_fasta=${ref_fasta}
     bwa_threads=${bwa_threads}
     
-    ${tools}/bwa/bwa-0.7.17/${bwa_commandline} ${fastq1} ${fastq2} | \
-    ${tools}/samtools-1.8/samtools view -1 -@ ${samtools_threads} - > ${output_bam_basename}.bam 2>> bwa_err.log
+    ${bwa_commandline} ${fastq1} ${fastq2} | \
+    samtools view -1 -@ ${samtools_threads} - > ${output_bam_basename}.bam 2>> bwa_err.log
   }
 
+  # this will likely make n1-highcpu-16, depending on the bwa_threads value provided
   runtime
-  {
-    memory: memory
+  {    
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: "14 GB"
     cpu: cpu
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output 
@@ -527,15 +603,15 @@ task SortSam_byQuery
   File input_bam
   String output_bam_basename
   Int compressionLvl
-  String picard
-  File sambamba
   Int cpus
 
   String flag
 
+  Int disk_size = ceil(size(input_bam, "GB")*2 + 20)
+
   command
   {
-     java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar ${picard} \
+     java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar $PICARD \
      SortSam \
      INPUT=${input_bam} \
      OUTPUT=${output_bam_basename}.bam \
@@ -543,13 +619,18 @@ task SortSam_byQuery
      CREATE_INDEX=true \
      CREATE_MD5_FILE=true \
      MAX_RECORDS_IN_RAM=800000
-     #${sambamba} sort -m 16G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
+     #$sambamba sort -m 16G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
   }
 
+  # n1-highcpu-16
   runtime
   {
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"    
     cpu: cpus
-    memory: "10000 MB"
+    memory: "14.40 GB"
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output
@@ -563,15 +644,19 @@ task MergeBamAlignment
    File alignedBAM
    File uBAM
    String output_bam_basename
-   String ref_fasta
+   File ref_fasta
+   File ref_dict
+   File ref_index
    String bwa_version
    String bwa_mem_commandline
    Int compressionLvl
-   String picard   
+
+   Int disk_size = ceil(size(alignedBAM, "GB") + size(uBAM, "GB") + size(ref_fasta, "GB") + 20)
+ 
 
    command
    {   
-      java -XX:ParallelGCThreads=2 -Dsamjdk.compression_level=${compressionLvl} -Xms3000m -jar ${picard} \
+      java -XX:ParallelGCThreads=2 -Dsamjdk.compression_level=${compressionLvl} -Xms3000m -jar $PICARD \
       MergeBamAlignment \
       VALIDATION_STRINGENCY=SILENT \
       EXPECTED_ORIENTATIONS=FR \
@@ -603,8 +688,12 @@ task MergeBamAlignment
 
    runtime
    {
+      docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"    
       cpu: 1
-      memory: "3200 MB"
+      memory: "3.75 GB"
+      disks: "local-disk " + disk_size + " HDD"
+      preemptible: 4
+      noAddress: true
    }
 
    output
@@ -620,11 +709,12 @@ task MarkDuplicates
    String output_bam_basename
    String metrics_filename
    Int compressionLvl
-   String picard
+
+   Int disk_size = ceil(size(input_bams[0], "GB")*length(input_bams) + 20)
 
    command
    {
-      java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar ${picard} \
+      java -Dsamjdk.compression_level=${compressionLvl} -Xms4000m -XX:ParallelGCThreads=2 -jar $PICARD \
       MarkDuplicates \
       INPUT=${sep=' INPUT=' input_bams} \
       OUTPUT=${output_bam_basename}.bam \
@@ -637,10 +727,15 @@ task MarkDuplicates
       CREATE_MD5_FILE=true
    }
 
+   # 4200 MB memory requested, must upgrade to n1-standard-2 machine
    runtime
    {
-      cpu: 1
-      memory: "4200 MB"
+      docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"    
+      cpu: 2
+      memory: "7.5 GB"
+      disks: "local-disk " + disk_size + " HDD"
+      preemptible: 4
+      noAddress: true
    }
 
   output
@@ -653,12 +748,13 @@ task MarkDuplicates
 task CreateSequenceGroupingTSV 
 {
   File ref_dict
+  Int disk_size = ceil(size(ref_dict, "GB") + 10)
 
   # Use python to create the Sequencing Groupings used for BQSR and PrintReads Scatter.
   # It outputs to stdout where it is parsed into a wdl Array[Array[String]]
   # e.g. [["1"], ["2"], ["3", "4"], ["5"], ["6", "7", "8"]]
   command <<<
-    python <<CODE
+    python3 <<CODE
     with open("${ref_dict}", "r") as ref_dict_file:
         sequence_tuple_list = []
         longest_sequence = 0
@@ -699,8 +795,12 @@ task CreateSequenceGroupingTSV
 
   runtime
   {
-    memory: "100 MB"
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
     cpu: 1
+    memory: "3.75 GB"
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output 
@@ -724,13 +824,14 @@ task BaseRecalibrator
   File known_indels_sites_idx
 
   File ref_dict
-  String ref_fasta
+  File ref_fasta
+  File ref_index
 
-  String gatk_launch
+  Int disk_size = ceil(size(input_bam, "GB") + size(dbSNP_vcf, "GB") + size(known_indels_sites_VCF, "GB") + size(ref_fasta, "GB") + 20)
 
   command 
   {
-    ${gatk_launch} --java-options "-XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -XX:+PrintFlagsFinal \
+    gatk --java-options "-XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -XX:+PrintFlagsFinal \
       -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps -XX:+PrintGCDetails \
       -Xloggc:gc_log.log -Xms4000m -XX:ParallelGCThreads=2" \
       BaseRecalibrator \
@@ -742,10 +843,16 @@ task BaseRecalibrator
       -known-sites ${known_indels_sites_VCF} \
       -L ${sep=" -L " sequence_group_interval}
   }
+
+  # n1-standard-2
   runtime 
   {
-    memory: "4 GB"
-    cpu: 1
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: "7.5 GB"
+    cpu: 2
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output 
@@ -758,11 +865,10 @@ task Fix_RG_Header
 {
    File input_bam
    String pyScript
-   String samtools
 
    command
    {
-      python ${pyScript} -H -i ${input_bam} -o - | ${samtools} reheader - ${input_bam} > fixed.bam
+      python3 ${pyScript} -H -i ${input_bam} -o - | samtools reheader - ${input_bam} > fixed.bam
    }
 
    output
@@ -776,18 +882,24 @@ task SortSam_byCoordinate
    File input_bam
    String memory
    Int cpu
-   File sambamba
+
+   Int disk_size = ceil(size(input_bam, "GB") + 10)
    
    command
    {
-      ${sambamba} sort -m ${memory} -o a1.marked.sorted.bam -t ${cpu} ${input_bam}
-      ${sambamba} index a1.marked.sorted.bam
+      sambamba sort -m ${memory} -o a1.marked.sorted.bam -t ${cpu} ${input_bam}
+      sambamba index a1.marked.sorted.bam
    }
    
+   # n1-highcpu-16
    runtime
    {
-     memory: memory
-     cpu: cpu
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: memory
+    cpu: cpu
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
    }
    
    output
@@ -802,15 +914,18 @@ task FixTags
   File input_bam
   File input_bam_index
   String output_bam_basename
-  String ref_fasta
+  File ref_fasta
+  File ref_dict
+  File ref_index
   String fix_tags_java_heap_memory
   String memory
-  String tools
   Int cpu
+
+  Int disk_size = ceil(size(input_bam, "GB") + 20)
   
   command
   {
-    java -Xmx${fix_tags_java_heap_memory} -XX:ParallelGCThreads=2 -jar ${tools}/picard.jar \
+    java -Xmx${fix_tags_java_heap_memory} -XX:ParallelGCThreads=2 -jar $PICARD \
     SetNmAndUqTags \
     INPUT=${input_bam} \
     OUTPUT=${output_bam_basename}.bam \
@@ -821,8 +936,12 @@ task FixTags
 
   runtime
   {
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
     memory: memory
     cpu: cpu
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output
@@ -838,20 +957,24 @@ task GatherBqsrReports
 {
   Array[File] input_bqsr_reports
   String output_report_filename
-  String tools
-  String gatk_version
+
+  Int disk_size = ceil(size(input_bqsr_reports[0], "GB")*length(input_bqsr_reports) + 10)
   
   command
   {
-      ${tools}/gatk-${gatk_version}/gatk --java-options "-Xms3000m -XX:ParallelGCThreads=2"  GatherBQSRReports \
+      gatk --java-options "-Xms3000m -XX:ParallelGCThreads=2"  GatherBQSRReports \
       -I ${sep=' -I ' input_bqsr_reports} \
       -O ${output_report_filename} 
   }
 
   runtime 
   {
-    memory: "3500 MB"
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: "3.75 GB"
     cpu: 1
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output
@@ -862,21 +985,21 @@ task GatherBqsrReports
 
 task ApplyBQSR
 {
-  String input_bam
+  File input_bam
   File input_bam_index
   String output_bam_basename
   File recalibration_report
   Array[String] sequence_group_interval
-  String ref_fasta
+  File ref_fasta
+  File ref_dict
+  File ref_index
  
   Int compression_level
-  String tools
-  
-  String gatk_version
+  Int disk_size = ceil(size(input_bam, "GB")*2 + size(ref_fasta, "GB") + 20)
 
   command 
   {
-    ${tools}/gatk-${gatk_version}/gatk --java-options "-XX:+PrintFlagsFinal -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps \
+    gatk --java-options "-XX:+PrintFlagsFinal -XX:+PrintGCTimeStamps -XX:+PrintGCDateStamps \
       -XX:+PrintGCDetails -Xloggc:gc_log.log \
       -XX:GCTimeLimit=50 -XX:GCHeapFreeLimit=10 -Dsamjdk.compression_level=${compression_level} -Xms3000m -XX:ParallelGCThreads=2" \
       ApplyBQSR \
@@ -892,8 +1015,12 @@ task ApplyBQSR
 
   runtime
   {
-    memory: "3500 MB"
+    docker: "gcr.io/cool-benefit-817/private/bgm-harvard/wgs-base:1"
+    memory: "3.75 GB"
     cpu: 1
+    disks: "local-disk " + disk_size + " HDD"
+    preemptible: 4
+    noAddress: true
   }
 
   output
@@ -908,11 +1035,10 @@ task CollectQualityYieldMetrics
 {
   File input_bam
   String metrics_filename
-  String picard
-  
+
   command 
   {
-     java -Xms2000m -jar ${picard} \
+     java -Xms2000m -jar $PICARD \
        CollectQualityYieldMetrics \
        INPUT=${input_bam} \
        OQ=true \
@@ -936,11 +1062,10 @@ task CollectUnsortedReadgroupBamQualityMetrics
 {
    File input_bam
    String output_bam_prefix
-   String picard
 
    command 
    {
-      java -Xms5000m -jar ${picard} \
+      java -Xms5000m -jar $PICARD \
         CollectMultipleMetrics \
         INPUT=${input_bam} \
         OUTPUT=${output_bam_prefix} \
