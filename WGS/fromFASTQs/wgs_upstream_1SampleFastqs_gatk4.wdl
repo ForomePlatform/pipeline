@@ -266,6 +266,8 @@ workflow wgs
             interval_list    = subInterval,
             interval_padding = 100,
             gvcf_basename    = subInterval + ".g",
+            dbsnp            = dbSNP_vcf,
+            dbsnp_idx        = dbSNP_vcf_idx,
             ref_fasta        = ref_fasta,
             ref_dict         = ref_dict,
             ref_index        = ref_index,
@@ -340,6 +342,8 @@ task HaplotypeCaller
   String interval_list
   Int interval_padding
   String gvcf_basename
+  File dbsnp
+  File dbsnp_idx
   File ref_fasta
   File ref_dict
   File ref_index
@@ -358,11 +362,12 @@ task HaplotypeCaller
       -I ${input_bam} \
       -L ${interval_list} \
       -ERC GVCF \
-      --max-alternate-alleles 3 \
+      -D ${dbsnp} \
+      --max-alternate-alleles 6 \
       -RF OverclippedReadFilter \
       --smith-waterman FASTEST_AVAILABLE \
-      --native-pair-hmm-use-double-precision true
-
+      --native-pair-hmm-use-double-precision true \
+      -new-qual true
 
     sed -i 's/ID=AD,Number=R/ID=AD,Number=\./g' ${gvcf_basename}.vcf
 
