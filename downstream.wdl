@@ -1,8 +1,7 @@
-import "genomics_db_import.wdl" as GenomicsDB_Import
-workflow wes_downstream
+workflow downstream
 {
    String ref_fasta = "/net/bgm/resources/hg19.fasta"
-   String gvcfs_dir = "/net/bgm/resources/wes/mem/"
+   String gvcfs_dir = "/net/bgm/resources/wgs/" #all g.vcfs live here
    Array[String] types_to_include = ["SNP", "INDEL"]
 
    String tools     = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools"
