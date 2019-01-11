@@ -292,6 +292,7 @@ workflow wgs
       output
       {
         File results = gatherOuts.results_out
+        Int finished = 1
       } 
 }
 
