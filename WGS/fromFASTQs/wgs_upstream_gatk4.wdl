@@ -1,25 +1,25 @@
 import "wgs_upstream_1SampleFastqs_gatk4.wdl" as sample_wf
-
-workflow wgs_upstream 
+import "downstream.wdl" as downstream
+workflow wgs_upstream
 {
-    #RESOURCES SECTION 
+    #RESOURCES SECTION
     File dbSNP_vcf
     File dbSNP_vcf_idx
     String known_indels_sites_VCF
     String known_indels_sites_idx
     String ref_fasta
-	
+
     File ref_dict
     File scattered_calling_intervals_list
 
     #INPUT SECTION
     Map[String, Array[Pair[File, File]]] input_fastqs		#Map that links a sample to the pair of FASTQ files
-    
+
     String tools					#Path to the directory that contains all needed tools and scripts
-    String base_name					#Base name that will be used in every output file. 
+    String base_name					#Base name that will be used in every output file.
     String res_dir				        #Path to the directory that will contain the results of the upstream run
-    
-    Int    bwa_threads								
+
+    Int    bwa_threads
     Int    samtools_threads
 
     #For every sample call the upstream sub-workflow
@@ -27,9 +27,9 @@ workflow wgs_upstream
     {
        String key_sampleName                      = key_value.left
        Array[Pair[File, File]] value_fastqs_array = key_value.right
-       
-       call sample_wf.wgs { 
-                             input: 
+
+       call sample_wf.wgs {
+                             input:
                                sampleName                       = key_sampleName,
                                fastqs                           = value_fastqs_array,
                                bwa_threads                      = bwa_threads,
@@ -42,10 +42,14 @@ workflow wgs_upstream
                                known_indels_sites_VCF           = known_indels_sites_VCF,
                                known_indels_sites_idx           = known_indels_sites_idx,
                                ref_fasta                        = ref_fasta,
-                               ref_dict                         = ref_dict, 
+                               ref_dict                         = ref_dict,
                                scattered_calling_intervals_list = scattered_calling_intervals_list
                           }
     }
+
+    call downstream.downstream
+    {
+        input:
+            finished = sample_wf.wgs.finished #start only after all upstreams have finished
+    }
 }
-
-
