@@ -1,5 +1,6 @@
 workflow downstream
 {
+   Array[Int] finished
    String ref_fasta = "/net/bgm/resources/hg19.fasta"
    String gvcfs_dir = "/net/bgm/resources/wgs/" #all g.vcfs live here
    Array[String] types_to_include = ["SNP", "INDEL"]
