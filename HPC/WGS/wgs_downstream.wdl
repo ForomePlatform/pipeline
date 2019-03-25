@@ -238,7 +238,7 @@ workflow wgs_downstream
              docker = "timuris/novo_caller:full",
              cpu = 1,
              memory = "2 GB",
-             command = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/denovo.out"
+             command = tools + "/denovo.out"
         }
 
         call ProcessBayesDeNovoSt1Res
@@ -254,16 +254,16 @@ workflow wgs_downstream
         {
            input:
              st1_res = BgmBayesDeNovo_stage1.stage_one_out,
-             family_bams = ["/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u1.hg19.bam", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u2.hg19.bam", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001a1.hg19.bam"],
-             family_bams_idx = ["/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u1.hg19.bam.bai", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u2.hg19.bam.bai", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001a1.hg19.bam.bai"],
-             dir_to_search = "/net/bgm/cases/",
+             family_bams = family_bams,
+             family_bams_idx = family_bams_idx,
+             dir_to_search = novo_dir_to_search,
              case_type = "wgs",
-             case_to_exclude = "bgm9001",
+             case_to_exclude = run_id,
              cpu = 1,
              memory = "1024 MB", 
              chr = chr,
-             script = "/net/bgm/tools/bgm_callers/denovo/pysam_prac.py",
-             bam_search_script = "/net/home/isaevt/python/findBams.py"
+             script = "pysam_prac.py",
+             bam_search_script = "findBams.py"
         }
 
         call ProcessBayesDeNovoSt2Res
@@ -272,7 +272,7 @@ workflow wgs_downstream
              res = BgmBayesDeNovo_stage2.st2_res,
              docker = "timuris/python2",
              memory = "1024 MB",
-             script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processBayesDeNovo.py"
+             script = tools + "processBayesDeNovo.py"
         }
 
         call ABCaller as AutosomalDominantCaller
@@ -336,7 +336,7 @@ workflow wgs_downstream
              res = BgmCompoundHetCaller.out,
              docker = "timuris/python2",
              memory = "1024 MB",
-             script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processBgmCompHet.py",
+             script = tools + "/processBgmCompHet.py",
              cpu = 1,
              vcf = VepAnnotate.out_vcf
         }
@@ -353,7 +353,7 @@ workflow wgs_downstream
              docker = "timuris/novo_caller:full",
              cpu = 1,
              memory = "2 GB",
-             command = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/homrec.out"
+             command = tools + "/homrec.out"
         }
 
         call ProcessHomRecRes
@@ -361,7 +361,7 @@ workflow wgs_downstream
            input:
              res = BgmHomRec.out,
              docker = "timuris/python2",
-             script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processHomRec.py",
+             script = tools + "/processHomRec.py",
              memory = "1024 MB",
              cpu = 1
         }
