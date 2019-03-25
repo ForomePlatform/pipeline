@@ -2,6 +2,8 @@ workflow wgs_downstream
 {
    String run_id
 
+   Int famiy_size
+
    String gatk_version = "4.1.0.0"
    String gatk_version_old = "4.0.12.0"
    File ref_fasta
@@ -197,249 +199,255 @@ workflow wgs_downstream
 
   scatter (chr in chromosomes)
   {
-     call SplitVcfByChr
+     if (family_size > 1)
      {
-        input:
-          in_vcf = ApplyRecalibration.recalibrated_vcf,
-          in_vcf_index = ApplyRecalibration.recalibrated_vcf_index,
-          #in_vcf = VepAnnotate.recalibrated_vcf,
-          #in_vcf_index = VepAnnotate.recalibrated_vcf_index,
-          chr = chr,
-          memory = "2 GB",
-          docker = "timuris/bwa"
-     }
-  
-     call VepAnnotate
-     {
-        input:
-          cache_path = cache_path,
-          exac_path = exac_path,
-          plugin_path = plugin_path,
-          input_vcf = SplitVcfByChr.vcf,
-          input_vcf_index = SplitVcfByChr.vcf_idx,
-          output_basename = chr + ".vep",
-          buffer = 50000,
-          number_of_threads = 4,
-          memory = "2 GB"
-     }     
+        call SplitVcfByChr
+        {
+           input:
+             in_vcf = ApplyRecalibration.recalibrated_vcf,
+             in_vcf_index = ApplyRecalibration.recalibrated_vcf_index,
+             #in_vcf = VepAnnotate.recalibrated_vcf,
+             #in_vcf_index = VepAnnotate.recalibrated_vcf_index,
+             chr = chr,
+             memory = "2 GB",
+             docker = "timuris/bwa"
+        }
 
-     call BgmBayesDeNovo_stage1
-     {
-        input:
-          case_ids  = case_ids_file,
-          input_vcf = VepAnnotate.out_vcf, 
-          x = 1.0,
-          p = 0.005,
-          e = 0.05,
-          docker = "timuris/novo_caller:full",
-          cpu = 1,
-          memory = "2 GB",
-          command = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/denovo.out"
-     }
-  
-     call ProcessBayesDeNovoSt1Res
-     {
-        input:
-          res = BgmBayesDeNovo_stage1.stage_one_out,
-          docker = "timuris/python2",
-          memory = "1024 MB",
-          script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processBayesDeNovo.py"
-     }
-     
-     call BgmBayesDeNovo_stage2
-     {
-        input:
-          st1_res = BgmBayesDeNovo_stage1.stage_one_out,
-          family_bams = ["/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u1.hg19.bam", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u2.hg19.bam", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001a1.hg19.bam"],
-          family_bams_idx = ["/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u1.hg19.bam.bai", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u2.hg19.bam.bai", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001a1.hg19.bam.bai"],
-          dir_to_search = "/net/bgm/cases/",
-          case_type = "wgs",
-          case_to_exclude = "bgm9001",
-          cpu = 1,
-          memory = "1024 MB", 
-          chr = chr,
-          script = "/net/bgm/tools/bgm_callers/denovo/pysam_prac.py",
-          bam_search_script = "/net/home/isaevt/python/findBams.py"
-     }
+        call VepAnnotate
+        {
+           input:
+             cache_path = cache_path,
+             exac_path = exac_path,
+             plugin_path = plugin_path,
+             input_vcf = SplitVcfByChr.vcf,
+             input_vcf_index = SplitVcfByChr.vcf_idx,
+             output_basename = chr + ".vep",
+             buffer = 50000,
+             number_of_threads = 4,
+             memory = "2 GB"
+        }     
 
-     call ProcessBayesDeNovoSt2Res
-     {
-        input:
-          res = BgmBayesDeNovo_stage2.st2_res,
-          docker = "timuris/python2",
-          memory = "1024 MB",
-          script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processBayesDeNovo.py"
-     }
-     
-     call ABCaller as AutosomalDominantCaller
-     {
-        input:
-          in_vcf = SplitVcfByChr.vcf,
-          fam    = fam,
-          id     = 0,
-          py_script = tools + "/ab_caller.py",
-          output_name = "autosomalDominant.calls"
-     }
+        call BgmBayesDeNovo_stage1
+        {
+           input:
+             case_ids  = case_ids_file,
+             input_vcf = VepAnnotate.out_vcf, 
+             x = 1.0,
+             p = 0.005,
+             e = 0.05,
+             docker = "timuris/novo_caller:full",
+             cpu = 1,
+             memory = "2 GB",
+             command = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/denovo.out"
+        }
 
-     call ABCaller as HomozygousRecessiveCaller
-     {
-        input:
-          in_vcf = SplitVcfByChr.vcf,
-          fam    = fam,
-          id     = 1,
-          py_script = tools + "/ab_caller.py",
-          output_name = "homozygousRecessive.calls"
-     }
+        call ProcessBayesDeNovoSt1Res
+        {
+           input:
+             res = BgmBayesDeNovo_stage1.stage_one_out,
+             docker = "timuris/python2",
+             memory = "1024 MB",
+             script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processBayesDeNovo.py"
+        }
 
-     call ABCaller as DeNovoCaller
-     {
-        input:
-          in_vcf = SplitVcfByChr.vcf,
-          fam    = fam,
-          id     = 2,
-          py_script = tools + "/ab_caller.py",
-          output_name = "deNovoCaller.calls"
-     }
-     
-     call ABCaller as CompoundHeterozygousCaller
-     {
-        input:
-          in_vcf = SplitVcfByChr.vcf,
-          fam    = fam,
-          id     = 3,
-          py_script = tools + "/ab_caller.py",
-          output_name = "compoundHeterozygous.calls"
-     }
-     
-  
-     call BgmCompoundHetCaller
-     {
-        input:
-          case_ids = case_ids_file,
-          input_vcf = VepAnnotate.out_vcf,
-          t = 0.9,
-          e = 0.1,
-          a = 0.2,
-          docker = "timuris/novo_caller:full",
-          cpu = 1,
-          memory = "2 GB",
-          command = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/compound_het.out"
-     }
-  
-     call ProcessBgmCompHetRes
-     {
-        input:
-          res = BgmCompoundHetCaller.out,
-          docker = "timuris/python2",
-          memory = "1024 MB",
-          script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processBgmCompHet.py",
-          cpu = 1,
-          vcf = VepAnnotate.out_vcf
-     }
-  
-     call BgmHomRec
-     {
-        input:
-          case_ids = case_ids_file,
-          input_vcf = VepAnnotate.out_vcf,
-          x = 1.0,
-          p = 0.9,
-          e = 0.05,
-          a = 0.2,
-          docker = "timuris/novo_caller:full",
-          cpu = 1,
-          memory = "2 GB",
-          command = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/homrec.out"
-     }
-  
-     call ProcessHomRecRes
-     {
-        input:
-          res = BgmHomRec.out,
-          docker = "timuris/python2",
-          script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processHomRec.py",
-          memory = "1024 MB",
-          cpu = 1
-     }
-  
-     call GatherCalls
-     {
-        input:
-          bgmHomRec_res = ProcessHomRecRes.hom_rec_calls,
-          compoundHeterozygous_res = CompoundHeterozygousCaller.calls,
-          deNovo_res = DeNovoCaller.calls,
-          homozygousRecessive_res = HomozygousRecessiveCaller.calls,
-          autosomalDominant_res = AutosomalDominantCaller.calls,
-          bgmCompoundHet_res = ProcessBgmCompHetRes.comp_het_calls,
-          #bgmDeNovo_res = ProcessBayesDeNovoSt1Res.bayes_deNovo_calls_st1,
-          bgmDeNovo_res = ProcessBayesDeNovoSt2Res.bayes_deNovo_calls_st2,
-          vcf = ApplyRecalibration.recalibrated_vcf,
-          vcf_index = ApplyRecalibration.recalibrated_vcf_index,
-          docker = "timuris/python2",
-          py_script = call_gathering_py,
-          memory = "1024 MB",
-          cpu = 1
-     }
-  
-     call Bgzip
-     {
-        input:
-          docker = "timuris/bwa",
-          memory = "2 GB",
-          cpu = 1,
-          vcf = GatherCalls.vcf_out,
-          out_base_name = "calls." + chr
-     }
+        call BgmBayesDeNovo_stage2
+        {
+           input:
+             st1_res = BgmBayesDeNovo_stage1.stage_one_out,
+             family_bams = ["/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u1.hg19.bam", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u2.hg19.bam", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001a1.hg19.bam"],
+             family_bams_idx = ["/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u1.hg19.bam.bai", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001u2.hg19.bam.bai", "/net/bgm/cases/bgm9001_wgs_run3/results/bgm9001a1.hg19.bam.bai"],
+             dir_to_search = "/net/bgm/cases/",
+             case_type = "wgs",
+             case_to_exclude = "bgm9001",
+             cpu = 1,
+             memory = "1024 MB", 
+             chr = chr,
+             script = "/net/bgm/tools/bgm_callers/denovo/pysam_prac.py",
+             bam_search_script = "/net/home/isaevt/python/findBams.py"
+        }
 
-     call MergeVcfCalls
-     {
-        input:
-          calls = Bgzip.vcf_out,
-          calls_idx = Bgzip.vcf_out_index,
-          vcf = VepAnnotate.out_vcf,
-          vcf_index = VepAnnotate.out_vcf_index,
-          out_base_name = chr + ".calls",
-          docker = "timuris/bcftools:bgzip",
-          memory = "2048 MB",
-          cpu = 1,
+        call ProcessBayesDeNovoSt2Res
+        {
+           input:
+             res = BgmBayesDeNovo_stage2.st2_res,
+             docker = "timuris/python2",
+             memory = "1024 MB",
+             script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processBayesDeNovo.py"
+        }
+
+        call ABCaller as AutosomalDominantCaller
+        {
+           input:
+             in_vcf = SplitVcfByChr.vcf,
+             fam    = fam,
+             id     = 0,
+             py_script = tools + "/ab_caller.py",
+             output_name = "autosomalDominant.calls"
+        }
+
+        call ABCaller as HomozygousRecessiveCaller
+        {
+           input:
+             in_vcf = SplitVcfByChr.vcf,
+             fam    = fam,
+             id     = 1,
+             py_script = tools + "/ab_caller.py",
+             output_name = "homozygousRecessive.calls"
+        }
+
+        call ABCaller as DeNovoCaller
+        {
+           input:
+             in_vcf = SplitVcfByChr.vcf,
+             fam    = fam,
+             id     = 2,
+             py_script = tools + "/ab_caller.py",
+             output_name = "deNovoCaller.calls"
+        }
+
+        call ABCaller as CompoundHeterozygousCaller
+        {
+           input:
+             in_vcf = SplitVcfByChr.vcf,
+             fam    = fam,
+             id     = 3,
+             py_script = tools + "/ab_caller.py",
+             output_name = "compoundHeterozygous.calls"
+        }
+
+
+        call BgmCompoundHetCaller
+        {
+           input:
+             case_ids = case_ids_file,
+             input_vcf = VepAnnotate.out_vcf,
+             t = 0.9,
+             e = 0.1,
+             a = 0.2,
+             docker = "timuris/novo_caller:full",
+             cpu = 1,
+             memory = "2 GB",
+             command = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/compound_het.out"
+        }
+
+        call ProcessBgmCompHetRes
+        {
+           input:
+             res = BgmCompoundHetCaller.out,
+             docker = "timuris/python2",
+             memory = "1024 MB",
+             script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processBgmCompHet.py",
+             cpu = 1,
+             vcf = VepAnnotate.out_vcf
+        }
+
+        call BgmHomRec
+        {
+           input:
+             case_ids = case_ids_file,
+             input_vcf = VepAnnotate.out_vcf,
+             x = 1.0,
+             p = 0.9,
+             e = 0.05,
+             a = 0.2,
+             docker = "timuris/novo_caller:full",
+             cpu = 1,
+             memory = "2 GB",
+             command = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/homrec.out"
+        }
+
+        call ProcessHomRecRes
+        {
+           input:
+             res = BgmHomRec.out,
+             docker = "timuris/python2",
+             script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processHomRec.py",
+             memory = "1024 MB",
+             cpu = 1
+        }
+
+        call GatherCalls
+        {
+           input:
+             bgmHomRec_res = ProcessHomRecRes.hom_rec_calls,
+             compoundHeterozygous_res = CompoundHeterozygousCaller.calls,
+             deNovo_res = DeNovoCaller.calls,
+             homozygousRecessive_res = HomozygousRecessiveCaller.calls,
+             autosomalDominant_res = AutosomalDominantCaller.calls,
+             bgmCompoundHet_res = ProcessBgmCompHetRes.comp_het_calls,
+             #bgmDeNovo_res = ProcessBayesDeNovoSt1Res.bayes_deNovo_calls_st1,
+             bgmDeNovo_res = ProcessBayesDeNovoSt2Res.bayes_deNovo_calls_st2,
+             vcf = ApplyRecalibration.recalibrated_vcf,
+             vcf_index = ApplyRecalibration.recalibrated_vcf_index,
+             docker = "timuris/python2",
+             py_script = call_gathering_py,
+             memory = "1024 MB",
+             cpu = 1
+        }
+
+        call Bgzip
+        {
+           input:
+             docker = "timuris/bwa",
+             memory = "2 GB",
+             cpu = 1,
+             vcf = GatherCalls.vcf_out,
+             out_base_name = "calls." + chr
+        }
+
+        call MergeVcfCalls
+        {
+           input:
+             calls = Bgzip.vcf_out,
+             calls_idx = Bgzip.vcf_out_index,
+             vcf = VepAnnotate.out_vcf,
+             vcf_index = VepAnnotate.out_vcf_index,
+             out_base_name = chr + ".calls",
+             docker = "timuris/bcftools:bgzip",
+             memory = "2048 MB",
+             cpu = 1,
+        }
      }
   }
 
-  call BcfToolsMergeVcf
+  if (family_size > 1)
   {
-     input:
-       vcfs = MergeVcfCalls.vcf_out,
-       vcfs_ind = MergeVcfCalls.vcf_out_index,
-       out_base_name = "calls",
-       out_extension = "vcf.gz",
-       out_type = "z",
-       num_threads = 4,
-       memory = "1 GB",
-       docker = "timuris/bcftools:bgzip"
-  }
+     call BcfToolsMergeVcf
+     {
+        input:
+          vcfs = MergeVcfCalls.vcf_out,
+          vcfs_ind = MergeVcfCalls.vcf_out_index,
+          out_base_name = "calls",
+          out_extension = "vcf.gz",
+          out_type = "z",
+          num_threads = 4,
+          memory = "1 GB",
+          docker = "timuris/bcftools:bgzip"
+     }
 
-  call SelectCaseVariants
-  {
-     input:
-       ref_fasta = ref_fasta,
-       ref_dict = ref_dict,
-       ref_fasta_index = ref_fasta_index,
-       ref_bwt = ref_bwt,
-       ref_sa = ref_sa,
-       ref_amb = ref_amb,
-       ref_ann = ref_ann,
-       ref_pac = ref_pac,
-       docker = "broadinstitute/gatk:latest",
-       memory = "4096 MB",
-       cpu = 1,
-       tools = tools,
-       gatk_version = gatk_version,
-       in_vcf = BcfToolsMergeVcf.out_vcf,
-       in_vcf_idx = BcfToolsMergeVcf.out_vcf_idx,
-       #in_vcf = pre_final_vcf,
-       samples = case_sample_names,
-       caller_names = ["BGM_DE_NOVO", "BGM_CMPD_HET", "BGM_HOM_REC", "BGM_AUTO_DOM", "BGM_BAYES_HOM_REC", "BGM_BAYES_DE_NOVO", "BGM_BAYES_CMPD_HET"],
-       out_base_name = "xbrowse.vep"
+     call SelectCaseVariants
+     {
+        input:
+          ref_fasta = ref_fasta,
+          ref_dict = ref_dict,
+          ref_fasta_index = ref_fasta_index,
+          ref_bwt = ref_bwt,
+          ref_sa = ref_sa,
+          ref_amb = ref_amb,
+          ref_ann = ref_ann,
+          ref_pac = ref_pac,
+          docker = "broadinstitute/gatk:latest",
+          memory = "4096 MB",
+          cpu = 1,
+          tools = tools,
+          gatk_version = gatk_version,
+          in_vcf = BcfToolsMergeVcf.out_vcf,
+          in_vcf_idx = BcfToolsMergeVcf.out_vcf_idx,
+          #in_vcf = pre_final_vcf,
+          samples = case_sample_names,
+          caller_names = ["BGM_DE_NOVO", "BGM_CMPD_HET", "BGM_HOM_REC", "BGM_AUTO_DOM", "BGM_BAYES_HOM_REC", "BGM_BAYES_DE_NOVO", "BGM_BAYES_CMPD_HET"],
+          out_base_name = "xbrowse.vep"
+     }
   }
 
   #output
