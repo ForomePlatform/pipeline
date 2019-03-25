@@ -8,10 +8,10 @@ workflow wgs
     String gatk_version = "4.1.0.0"
     String gatk_version_old = "4.0.12.0"
     
-    String directory_to_search = "/net/bgm/resources/wgs/aln/"
-    String tmp_dir = "/net/home/isaevt/tmp_dir/"
+    String directory_to_search 
+    String tmp_dir 
     
-    File chr_intervals_file     = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/wdl/final/variant_caller_intervals.file"
+    File chr_intervals_file
     
     Array[String] recalibration_tranche_values = ["100.0", "99.95", "99.9", "99.5", "99.0"]
     Array[String] recalibration_annotation_values = ["FS", "ReadPosRankSum", "MQRankSum", "QD", "SOR", "DP"]
@@ -35,9 +35,9 @@ workflow wgs
     File one_thousand_genomes_vcf_idx
     
     #PATHS FOR VEP
-    String cache_path = "/net/bgm/resources/vep-85-cache/"
-    String exac_path = "/net/bgm/resources/ExAC.r0.3.sites.vep.b37.vcf.gz"
-    String plugin_path = "/net/bgm/tools/vep-85/plugins/"
+    String cache_path
+    String exac_path 
+    String plugin_path 
     
     File ref_fasta
     File ref_dict
@@ -49,7 +49,7 @@ workflow wgs
     File ref_pac
     
     File case_fam
-    File call_gathering_py = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/callsGathering.py"
+    File call_gathering_py
     
     #INPUT SECTION
     Map[String, Array[Pair[File, File]]] input_fastqs           #Map that links a sample to the pair of FASTQ files
