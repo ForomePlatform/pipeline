@@ -51,6 +51,8 @@ workflow wgs
     File case_fam
     File call_gathering_py
     
+    File case_ids_file
+    
     #INPUT SECTION
     Map[String, Array[Pair[File, File]]] input_fastqs           #Map that links a sample to the pair of FASTQ files
 
@@ -129,7 +131,7 @@ workflow wgs
                                         exac_path                                               = exac_path,
                                         plugin_path                                             = plugin_path,
                                         fam                                                     = case_fam,
-                                        case_ids_file                                           = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/resources/case_ids.txt",
+                                        case_ids_file                                           = case_ids_file,
                                    }
 
     #output
