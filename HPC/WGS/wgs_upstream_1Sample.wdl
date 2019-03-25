@@ -162,7 +162,7 @@ workflow wgs_upstream
                    gatk_version        = gatk_version,
                    tmp_dir             = "/net/home/isaevt/tmp_dir"
 	      }
-
+              # Should sort anyway?
               #call SortSam_byQuery as MergeAlignmentSort
               #{
               #   input:
@@ -194,9 +194,9 @@ workflow wgs_upstream
            metrics_filename     = "duplicate_metrics",
            tools                = tools,
            gatk_version         = gatk_version,
-           memory               = "128 GB",
+           memory               = "16 GB",
            cpu                  = 4,
-           tmp_dir              = "/net/home/isaevt/tmp_dir"
+           tmp_dir              = "/tmp_dir"
       }
 
       call SortSam_byQuery as sortBeforeFix
