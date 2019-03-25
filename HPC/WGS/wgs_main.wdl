@@ -94,6 +94,7 @@ workflow wgs
     call downstream.wgs_downstream {
                                       input:
                                         run_id                                                  = run_id,
+                                        family_size                                             = length(read_lines(write_map(input_fastqs)))
                                         gatk_version                                            = gatk_version,
                                         gatk_version_old                                        = gatk_version_old,
                                         ref_fasta                                               = ref_fasta,
