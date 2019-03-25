@@ -52,6 +52,7 @@ workflow wgs
     File call_gathering_py
     
     File case_ids_file
+    Array[String] case_sample_names
     
     #INPUT SECTION
     Map[String, Array[Pair[File, File]]] input_fastqs           #Map that links a sample to the pair of FASTQ files
@@ -125,7 +126,7 @@ workflow wgs
                                         omni_vcf_idx                                            = omni_vcf_idx,
                                         one_thousand_genomes_vcf                                = one_thousand_genomes_vcf,
                                         one_thousand_genomes_vcf_idx                            = one_thousand_genomes_vcf_idx,
-                                        case_sample_names                                       = ["bgm9001u1", "bgm9001u2", "bgm9001a1"],
+                                        case_sample_names                                       = case_sample_names,
                                         call_gathering_py                                       = call_gathering_py,
                                         cache_path                                              = cache_path,
                                         exac_path                                               = exac_path,
