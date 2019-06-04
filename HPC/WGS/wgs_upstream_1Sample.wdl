@@ -32,9 +32,11 @@ workflow wgs_upstream
       Int samtools_threads
 
       String tools
-      String gatk_version = "4.1.0.0"
+      String gatk_version
 
-      String gvcfs_dir 
+      String gvcfs_dir
+
+      String tmp_dir 
 
       call CreateSequenceGroupingTSV
       {
@@ -48,7 +50,7 @@ workflow wgs_upstream
            tools = tools
       }
    
-      #String key_sampleName         =sampleName
+      #String key_sampleName         = sampleName
       #Pair[File, File] value_fastqs = (fastq1, fastq2)
 
       scatter(index in range(length(fastqs)))
@@ -62,7 +64,7 @@ workflow wgs_upstream
               fq = fq_pair.left,
               suffix = "1",
               case_name = base_name + sampleName + "_" + index,
-              cpu = 2,
+              cpu = 4,
               memory = "1 GB"
          }
 
@@ -72,7 +74,7 @@ workflow wgs_upstream
               fq = fq_pair.right,
               suffix = "2",
               case_name = base_name + sampleName + "_" + index,
-              cpu = 2,
+              cpu = 4,
               memory = "1 GB"
          }
       }
@@ -117,7 +119,7 @@ workflow wgs_upstream
 	           output_bam_basename = "sorted_uBAM_" + base_name + sampleName + "." + i,
 	           compressionLvl      = 5,
 	           cpus                = 8,
-                   sambamba            = tools + "/my_sambamba/sambamba",
+	           sambamba            = tools + "/sambamba",
 	           flag                = "-n"
 	      }
 	  
@@ -130,15 +132,15 @@ workflow wgs_upstream
 	           output_bam_basename  = base_name + "." + sampleName + ".unmerged",
 	           ref_fasta            = ref_fasta,
 	           ref_dict             = ref_dict,
-                   ref_fasta_index      = ref_fasta_index,
-                   ref_bwt              = ref_bwt,
-                   ref_sa               = ref_sa,
-                   ref_amb              = ref_amb,
-                   ref_ann              = ref_ann,
-                   ref_pac              = ref_pac,
+	           ref_fasta_index      = ref_fasta_index,
+	           ref_bwt              = ref_bwt,
+	           ref_sa               = ref_sa,
+	           ref_amb              = ref_amb,
+	           ref_ann              = ref_ann,
+	           ref_pac              = ref_pac,
 	           cpu                  = bwa_threads,
-                   memory               = "16 GB",
-                   tools                = tools
+	           memory               = "16 GB",
+	           tools                = tools
 	      }
 	  
 	      call MergeBamAlignment
@@ -150,17 +152,17 @@ workflow wgs_upstream
 	           output_bam_basename = base_name + "." + sampleName + "_" + i + "merged.aligned",
 	           ref_fasta           = ref_fasta,
 	           ref_dict            = ref_dict,
-                   ref_fasta_index     = ref_fasta_index,
-                   ref_bwt             = ref_bwt,
-                   ref_sa              = ref_sa,
-                   ref_amb             = ref_amb,
-                   ref_ann             = ref_ann,
-                   ref_pac             = ref_pac,
+	           ref_fasta_index     = ref_fasta_index,
+               ref_bwt             = ref_bwt,
+               ref_sa              = ref_sa,
+               ref_amb             = ref_amb,
+               ref_ann             = ref_ann,
+               ref_pac             = ref_pac,
 	           bwa_version         = GetBwaVersion.version,
 	           bwa_mem_commandline = bwa_commandline,
-                   tools               = tools,
-                   gatk_version        = gatk_version,
-                   tmp_dir             = "/net/home/isaevt/tmp_dir"
+               tools               = tools,
+               gatk_version        = gatk_version,
+               tmp_dir             = tmp_dir
 	      }
               # Should sort anyway?
               #call SortSam_byQuery as MergeAlignmentSort
@@ -170,21 +172,11 @@ workflow wgs_upstream
               #     output_bam_basename = "sorted_aligned_" + base_name + sampleName + "." + i,
               #     compressionLvl      = 5,
               #     cpus                = 8,
-              #     sambamba            = tools + "/my_sambamba/sambamba",
+              #     sambamba            = tools + "/sambamba",
               #     flag                = "-n"
               #}
 	  
       }
-	
-      #call MarkDuplicates
-      #{
-      #   input:
-      #     input_bams           = MergeAlignmentSort.output_bam,
-      #     output_bam_basename  = base_name + "." + sampleName + ".aligned.unsorted.duplicates_marked",
-      #     metrics_filename     = "duplicate_metrics",
-      #     tools                = tools,
-      #     gatk_version         = gatk_version
-      #}
 
       call MarkDuplicatesSpark
       {
@@ -194,9 +186,11 @@ workflow wgs_upstream
            metrics_filename     = "duplicate_metrics",
            tools                = tools,
            gatk_version         = gatk_version,
-           memory               = "16 GB",
-           cpu                  = 4,
-           tmp_dir              = "/tmp_dir"
+           memory               = "11 GB",
+           cpu                  = 12,
+           tmp_dir              = tmp_dir,
+           executor_mem         = "64G",
+           driver_mem           = "64G"
       }
 
       call SortSam_byQuery as sortBeforeFix
@@ -206,7 +200,7 @@ workflow wgs_upstream
            output_bam_basename = base_name + "." + sampleName + ".aligned.duplicate_marked.sorted",
            compressionLvl      = 5,
            cpus                = 8,
-           sambamba            = tools + "/my_sambamba/sambamba",
+           sambamba            = tools + "/sambamba",
            flag                = ""
       }
 
@@ -335,21 +329,13 @@ workflow wgs_upstream
          }
       }
 
-      #call GatherResults
-      #{
-      #   input:
-      #     bam = GatherBamFiles.output_bam,
-      #     bai = GatherBamFiles.output_bam_index,
-      #     gvcfs = HaplotypeCaller.output_gvcf,
-      #     gvcfs_idx = HaplotypeCaller.output_gvcf_index,
-      #     dir_name = base_name + sampleName
-      #}
-
       output
       {
          Array[File] gvcfs = HaplotypeCaller.output_gvcf
          Array[File] gvcfs_idx = HaplotypeCaller.output_gvcf_index
          Pair[String, Pair[File, File]] sample_bam = (sampleName, (GatherBamFiles.output_bam, GatherBamFiles.output_bam_index))
+         File family_bam = GatherBamFiles.output_bam
+         File family_bam_idx = GatherBamFiles.output_bam_index
          Int done = 1
       }
 }
@@ -499,8 +485,6 @@ task Fastq_to_uBAM
       File uBAM = "${output_uBAM_baseName}.bam" 
    }
 }
-
-
 
 # Get version of BWA
 task GetBwaVersion
@@ -686,18 +670,23 @@ task MarkDuplicatesSpark
    String gatk_version
    String memory
    String tmp_dir
+   String executor_mem
+   String driver_mem
    Int cpu
 
    command
    {
-      ${tools}/gatk-${gatk_version}/gatk  MarkDuplicatesSpark \
+      ${tools}/gatk-${gatk_version}/gatk --java-options "-Xmx120G -Xms20G"  MarkDuplicatesSpark \
       -I ${sep=' -I ' input_bams} \
       -O ${output_bam_basename}.bam \
       -M ${metrics_filename} \
       -VS SILENT \
       --optical-duplicate-pixel-distance 2500 \
       --spark-master local[${cpu}] \
-      --tmp-dir ${tmp_dir}
+      --tmp-dir ${tmp_dir} \
+      --conf 'spark.executor.memory=${executor_mem}' \
+      --conf 'spark.driver.memory=${driver_mem}' \
+      --conf 'spark.executor.cores=${cpu}'
    }
 
    runtime
@@ -712,44 +701,6 @@ task MarkDuplicatesSpark
       File output_bam_index  = "${output_bam_basename}.bam.bai"
       File duplicate_metrics = "${metrics_filename}"
    }
-}
-
-task MarkDuplicates
-{
-   Array[String] input_bams
-   String output_bam_basename
-   String metrics_filename
-   String tools
-   String gatk_version
-
-   command
-   { 
-      ${tools}/gatk-${gatk_version}/gatk --java-options "-Xms16g" MarkDuplicates \
-      --INPUT ${sep=' --INPUT ' input_bams} \
-      --OUTPUT ${output_bam_basename}.bam \
-      --METRICS_FILE ${metrics_filename} \
-      --VALIDATION_STRINGENCY SILENT \
-      --OPTICAL_DUPLICATE_PIXEL_DISTANCE 2500 \
-      --ASSUME_SORT_ORDER queryname \
-      --CLEAR_DT false \
-      --ADD_PG_TAG_TO_READS false \
-      --CREATE_MD5_FILE true \
-      --COMPRESSION_LEVEL 5 \
-      --MAX_RECORDS_IN_RAM 1000000
-   }
-
-   runtime
-   {
-      docker: "broadinstitute/gatk:latest"
-      cpu: 1
-      memory: "64 GB"
-   }
-
-  output
-  {
-     File output_bam        = "${output_bam_basename}.bam"
-     File duplicate_metrics = "${metrics_filename}"
-  }
 }
 
 task CreateSequenceGroupingTSV 
@@ -1027,7 +978,7 @@ task GatherFiles
 	
    command
    <<<
-     find ../ -type f -name "*${suffix}.gz" -exec mv {} "$(pwd)" \;
+     find -L ../ -type f -name "*${suffix}.gz" -exec mv {} "$(pwd)" \;
    >>>
 
    runtime
