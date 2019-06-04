@@ -79,6 +79,8 @@ workflow wgs
     String gatk_launch_3_8
 
     String novo_dir_to_search                                   #root dir to search for .bam files
+    String v_env_path_activation                                #python v_env for stage2 novo_caller
+    File stub_file                                              #stub_file for select_first function
 
     call GenerateCaseIdsFile
     {
@@ -185,6 +187,8 @@ workflow wgs
                                         plugin_path                                             = plugin_path,
                                         fam                                                     = case_fam,
                                         case_ids_file                                           = GenerateCaseIdsFile.case_ids,
+                                        v_env_path_activation                                   = v_env_path_activation,
+                                        stub_file                                               = stub_file
                                    }
 
     call qc_rep.qc_report          {
