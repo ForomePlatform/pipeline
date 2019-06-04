@@ -2,10 +2,8 @@ workflow wgs_downstream
 {
    String run_id
 
-   Int famiy_size
-
-   String gatk_version = "4.1.0.0"
-   String gatk_version_old = "4.0.12.0"
+   String gatk_version
+   String gatk_version_old
    File ref_fasta
    File ref_dict       
    File ref_fasta_index
@@ -29,7 +27,11 @@ workflow wgs_downstream
 
    Array[String] SNPsVariantRecalibrator_recalibration_tranche_values = ["100.0", "99.95", "99.9", "99.8", "99.6", "99.5", "99.0"]
    Array[String] SNPsVariantRecalibrator_recalibration_annotation_values = ["QD", "MQRankSum", "ReadPosRankSum", "FS", "MQ", "SOR", "DP"]
-      
+
+   Array[File] family_bams
+   Array[File] family_bams_idx
+   String novo_dir_to_search      
+
    File dbsnp_vcf
    File dbsnp_vcf_index
 
@@ -53,6 +55,13 @@ workflow wgs_downstream
    
    File fam 
    File case_ids_file
+
+   File stub_file #for select_first function to cast Type? to Type
+
+   Int family_size
+
+   String v_env_path_activation
+
    scatter (index in range(length(chr_intervals)))
    {
       Int i = index
@@ -78,7 +87,7 @@ workflow wgs_downstream
            tools = tools,
            gatk_version = gatk_version,
            cpu = 2,
-           memory = "8000 MB",
+           memory = "16000 MB",
            interval = chr_intervals[i],
            dbsnp = dbsnp_vcf,
            dbsnp_ind = dbsnp_vcf_index
@@ -130,8 +139,6 @@ workflow wgs_downstream
        recalibration_annotation_values = recalibration_annotation_values,
        vcf = MergeGenotypeRes.out_vcf,
        vcf_index = MergeGenotypeRes.out_vcf_index,
-       #vcf = out_vcf,
-       #vcf_index = out_vcf_index,
        dbsnp_resource_vcf = dbsnp_vcf,
        dbsnp_resource_vcf_index = dbsnp_vcf_index,
        mills_resource_vcf = mills_vcf,
@@ -152,8 +159,6 @@ workflow wgs_downstream
        recalibration_annotation_values = SNPsVariantRecalibrator_recalibration_annotation_values,
        vcf = MergeGenotypeRes.out_vcf,
        vcf_index = MergeGenotypeRes.out_vcf_index,
-       #vcf = out_vcf,
-       #vcf_index = out_vcf_index,
        dbsnp_resource_vcf = dbsnp_vcf,
        dbsnp_resource_vcf_index = dbsnp_vcf_index,
        hapmap_resource_vcf = hapmap_vcf,
@@ -175,10 +180,7 @@ workflow wgs_downstream
        recalibrated_vcf_filename = "recalibrated.vcf.gz",
        input_vcf =  MergeGenotypeRes.out_vcf,
        input_vcf_index = MergeGenotypeRes.out_vcf_index,
-  
-       #input_vcf = out_vcf,
-       #input_vcf_index = out_vcf_index,
-  
+
        indels_recalibration = IndelsVariantRecalibrator.recalibration,
        indels_recalibration_index = IndelsVariantRecalibrator.recalibration_index,
        indels_tranches = IndelsVariantRecalibrator.tranches,
@@ -199,34 +201,61 @@ workflow wgs_downstream
 
   scatter (chr in chromosomes)
   {
+     call SplitVcfByChr
+     {
+        input:
+          in_vcf = ApplyRecalibration.recalibrated_vcf,
+          in_vcf_index = ApplyRecalibration.recalibrated_vcf_index,
+          chr = chr,
+          memory = "2 GB",
+          docker = "timuris/bwa"
+     }
+
+     call VepAnnotate
+     {
+        input:
+          cache_path = cache_path,
+          exac_path = exac_path,
+          plugin_path = plugin_path,
+          input_vcf = SplitVcfByChr.vcf,
+          input_vcf_index = SplitVcfByChr.vcf_idx,
+          output_basename = chr + ".vep",
+          buffer = 50000,
+          number_of_threads = 4,
+          memory = "2 GB"
+     }
+
+     if (family_size == 1)
+     {
+        call SelectCaseVariants as SelectSingleProbandVariants
+        {
+           input:
+             ref_fasta = ref_fasta,
+             ref_dict = ref_dict,
+             ref_fasta_index = ref_fasta_index,
+             ref_bwt = ref_bwt,
+             ref_sa = ref_sa,
+             ref_amb = ref_amb,
+             ref_ann = ref_ann,
+             ref_pac = ref_pac,
+             docker = "broadinstitute/gatk:latest",
+             memory = "4096 MB",
+             cpu = 1,
+             tools = tools,
+             gatk_version = gatk_version,
+             in_vcf = VepAnnotate.out_vcf,
+             in_vcf_idx = VepAnnotate.out_vcf_index,
+             samples = case_sample_names,
+             caller_names = ["BGM_DE_NOVO", "BGM_CMPD_HET", "BGM_HOM_REC", "BGM_AUTO_DOM", "BGM_BAYES_HOM_REC", "BGM_BAYES_DE_NOVO", "BGM_BAYES_CMPD_HET"],
+             out_base_name = chr + ".xbrowse.vep"
+        }
+     }
+     
+     File SelectOutputVcf = select_first([SelectSingleProbandVariants.out_vcf, stub_file])
+     File SelectOutputVcfIdx = select_first([SelectSingleProbandVariants.out_vcf_idx, stub_file])
+
      if (family_size > 1)
      {
-        call SplitVcfByChr
-        {
-           input:
-             in_vcf = ApplyRecalibration.recalibrated_vcf,
-             in_vcf_index = ApplyRecalibration.recalibrated_vcf_index,
-             #in_vcf = VepAnnotate.recalibrated_vcf,
-             #in_vcf_index = VepAnnotate.recalibrated_vcf_index,
-             chr = chr,
-             memory = "2 GB",
-             docker = "timuris/bwa"
-        }
-
-        call VepAnnotate
-        {
-           input:
-             cache_path = cache_path,
-             exac_path = exac_path,
-             plugin_path = plugin_path,
-             input_vcf = SplitVcfByChr.vcf,
-             input_vcf_index = SplitVcfByChr.vcf_idx,
-             output_basename = chr + ".vep",
-             buffer = 50000,
-             number_of_threads = 4,
-             memory = "2 GB"
-        }     
-
         call BgmBayesDeNovo_stage1
         {
            input:
@@ -247,7 +276,7 @@ workflow wgs_downstream
              res = BgmBayesDeNovo_stage1.stage_one_out,
              docker = "timuris/python2",
              memory = "1024 MB",
-             script = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/processBayesDeNovo.py"
+             script = tools + "/processBayesDeNovo.py"
         }
 
         call BgmBayesDeNovo_stage2
@@ -262,8 +291,9 @@ workflow wgs_downstream
              cpu = 1,
              memory = "1024 MB", 
              chr = chr,
-             script = "pysam_prac.py",
-             bam_search_script = "findBams.py"
+             script = tools + "/pysam_prac.py",
+             bam_search_script = tools + "/findBams.py",
+             v_env_path_activation = v_env_path_activation
         }
 
         call ProcessBayesDeNovoSt2Res
@@ -272,7 +302,7 @@ workflow wgs_downstream
              res = BgmBayesDeNovo_stage2.st2_res,
              docker = "timuris/python2",
              memory = "1024 MB",
-             script = tools + "processBayesDeNovo.py"
+             script = tools + "/processBayesDeNovo.py"
         }
 
         call ABCaller as AutosomalDominantCaller
@@ -298,20 +328,20 @@ workflow wgs_downstream
         call ABCaller as DeNovoCaller
         {
            input:
-             in_vcf = SplitVcfByChr.vcf,
-             fam    = fam,
-             id     = 2,
-             py_script = tools + "/ab_caller.py",
+             in_vcf      = SplitVcfByChr.vcf,
+             fam         = fam,
+             id          = 2,
+             py_script   = tools + "/ab_caller.py",
              output_name = "deNovoCaller.calls"
         }
 
         call ABCaller as CompoundHeterozygousCaller
         {
            input:
-             in_vcf = SplitVcfByChr.vcf,
-             fam    = fam,
-             id     = 3,
-             py_script = tools + "/ab_caller.py",
+             in_vcf      = SplitVcfByChr.vcf,
+             fam         = fam,
+             id          = 3,
+             py_script   = tools + "/ab_caller.py",
              output_name = "compoundHeterozygous.calls"
         }
 
@@ -319,15 +349,15 @@ workflow wgs_downstream
         call BgmCompoundHetCaller
         {
            input:
-             case_ids = case_ids_file,
+             case_ids  = case_ids_file,
              input_vcf = VepAnnotate.out_vcf,
-             t = 0.9,
-             e = 0.1,
-             a = 0.2,
-             docker = "timuris/novo_caller:full",
-             cpu = 1,
-             memory = "2 GB",
-             command = "/net/home/isaevt/cromwell/wgs_workflow_gatk4/wes/tools/compound_het.out"
+             t         = 0.9,
+             e         = 0.1,
+             a         = 0.2,
+             docker    = "timuris/novo_caller:full",
+             cpu       = 1,
+             memory    = "2 GB",
+             command   = tools + "/compound_het.out"
         }
 
         call ProcessBgmCompHetRes
@@ -408,6 +438,25 @@ workflow wgs_downstream
              cpu = 1,
         }
      }
+
+     File MergeVcfCallsVcf = select_first([MergeVcfCalls.vcf_out, stub_file])
+     File MergeVcfCallsVcfIdx = select_first([MergeVcfCalls.vcf_out_index, stub_file])
+  }
+
+  if (family_size == 1)
+  {
+     call BcfToolsMergeVcf as SingleProbandOutputMerge
+     {
+        input:
+          vcfs = SelectOutputVcf,
+          vcfs_ind = SelectOutputVcfIdx,
+          out_base_name = "final",
+          out_extension = "vcf.gz",
+          out_type = "z",
+          num_threads = 4,
+          memory = "1 GB",
+          docker = "timuris/bcftools:bgzip"
+     }
   }
 
   if (family_size > 1)
@@ -415,8 +464,8 @@ workflow wgs_downstream
      call BcfToolsMergeVcf
      {
         input:
-          vcfs = MergeVcfCalls.vcf_out,
-          vcfs_ind = MergeVcfCalls.vcf_out_index,
+          vcfs = MergeVcfCallsVcf,
+          vcfs_ind = MergeVcfCallsVcfIdx,
           out_base_name = "calls",
           out_extension = "vcf.gz",
           out_type = "z",
@@ -450,11 +499,13 @@ workflow wgs_downstream
      }
   }
 
-  #output
-  #{
-  #   File vcf = VepAnnotate.recalibrated_vcf
-  #   File vcf_idx = VepAnnotate.recalibrated_vcf_index
-  #}
+  output
+  {
+     File Vcf_for_QC         = select_first([BcfToolsMergeVcf.out_vcf, SingleProbandOutputMerge.out_vcf]) 
+     File VcfIdx_for_QC      = select_first([BcfToolsMergeVcf.out_vcf_idx, SingleProbandOutputMerge.out_vcf_idx])
+     File Vcf_for_xBrowse    = select_first([SelectCaseVariants.out_vcf, SingleProbandOutputMerge.out_vcf])
+     File VcfIdx_for_xBrowse = select_first([SelectCaseVariants.out_vcf_idx, SingleProbandOutputMerge.out_vcf_idx])
+  }
 }
 
 task ConsolidateGVCFs
@@ -600,6 +651,7 @@ task SelectCaseVariants
    output
    {
       File out_vcf = "${out_base_name}.vcf.gz"
+      File out_vcf_idx = "${out_base_name}.vcf.gz.tbi"
    }
 }
 
@@ -889,10 +941,18 @@ task BgmBayesDeNovo_stage2
    String chr
    File script
    File bam_search_script
+
+   #optional
+   String v_env_path_activation
   
    command
    <<<
-      . /net/data/bgm/tools/venv/bin/activate
+      if [[ ! -s ${st1_res} ]]; then 
+        echo "stage 1 res is empty"
+        touch ${chr}.st2.res
+        exit 0;
+      fi;
+      ${v_env_path_activation}
       echo -e ' ${sep='\n' family_bams}' > case.bams
       python ${bam_search_script} ${dir_to_search} ${case_type}
       python ${script} -I ${st1_res} -U allBams.txt -T case.bams -O ${chr}.st2.res
@@ -928,6 +988,18 @@ task BgmBayesDeNovo_stage1
   command
   {
      zcat ${input_vcf} > decompressed.vcf
+
+     input="${case_ids}"
+     while IFS= read -r var
+     do
+       echo "$var"
+       if [ "$var" = "-1" ]; then
+         echo "case_ids has -1. Not running DeNovo caller"
+         touch bayes_de_novo_st1.out.vcf
+         exit 0
+       fi
+     done < "$input"
+
      ${command} -I decompressed.vcf -O bayes_de_novo_st1.out.vcf -T ${case_ids} -X ${x} -P ${p} -E ${e}
   }
 
@@ -1174,10 +1246,10 @@ task SNPsVariantRecalibrator
       -an ${sep=' -an ' recalibration_annotation_values} \
       -mode SNP \
       --max-gaussians 6 \
-      --resource hapmap,known=false,training=true,truth=true,prior=15:${hapmap_resource_vcf} \
-      --resource omni,known=false,training=true,truth=true,prior=12:${omni_resource_vcf} \
-      --resource 1000G,known=false,training=true,truth=false,prior=10:${one_thousand_genomes_resource_vcf} \
-      --resource dbsnp,known=true,training=false,truth=false,prior=7:${dbsnp_resource_vcf}
+      --resource:hapmap,known=false,training=true,truth=true,prior=15 ${hapmap_resource_vcf} \
+      --resource:omni,known=false,training=true,truth=true,prior=12 ${omni_resource_vcf} \
+      --resource:1000G,known=false,training=true,truth=false,prior=10 ${one_thousand_genomes_resource_vcf} \
+      --resource:dbsnp,known=true,training=false,truth=false,prior=7 ${dbsnp_resource_vcf}
   }
 
   runtime
@@ -1231,8 +1303,8 @@ task IndelsVariantRecalibrator
                      -an ${sep=' -an ' recalibration_annotation_values} \
                      -mode INDEL \
                      --max-gaussians 4 \
-                     --resource mills,known=false,training=true,truth=true,prior=12:${mills_resource_vcf} \
-                     --resource dbsnp,known=true,training=false,truth=false,prior=2:${dbsnp_resource_vcf}
+                     --resource:mills,known=false,training=true,truth=true,prior=12 ${mills_resource_vcf} \
+                     --resource:dbsnp,known=true,training=false,truth=false,prior=2 ${dbsnp_resource_vcf}
    }
 
    output
