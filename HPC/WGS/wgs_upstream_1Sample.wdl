@@ -110,72 +110,72 @@ workflow wgs_upstream
               memory               = "4096 MB",
               java_heap            = "-Xmx4096m",
               gatk_version         = gatk_version
-	      }
+	  }
 	  
-	      call SortSam_byQuery as Fastq_to_uBAM_sort
-	      {
-	         input:
-	           input_bam           = Fastq_to_uBAM.uBAM,
-	           output_bam_basename = "sorted_uBAM_" + base_name + sampleName + "." + i,
-	           compressionLvl      = 5,
-	           cpus                = 8,
-	           sambamba            = tools + "/sambamba",
-	           flag                = "-n"
-	      }
+	  call SortSam_byQuery as Fastq_to_uBAM_sort
+	  {
+	     input:
+	       input_bam           = Fastq_to_uBAM.uBAM,
+	       output_bam_basename = "sorted_uBAM_" + base_name + sampleName + "." + i,
+	       compressionLvl      = 5,
+	       cpus                = 8,
+	       sambamba            = tools + "/sambamba",
+	       flag                = "-n"
+	  }
 	  
-	      call BwaMem
-	      {
-	         input:
-	           fastq1               = fastq_pair.left,
-	           fastq2               = fastq_pair.right,
-	           bwa_commandline      = bwa_commandline,
-	           output_bam_basename  = base_name + "." + sampleName + ".unmerged",
-	           ref_fasta            = ref_fasta,
-	           ref_dict             = ref_dict,
-	           ref_fasta_index      = ref_fasta_index,
-	           ref_bwt              = ref_bwt,
-	           ref_sa               = ref_sa,
-	           ref_amb              = ref_amb,
-	           ref_ann              = ref_ann,
-	           ref_pac              = ref_pac,
-	           cpu                  = bwa_threads,
-	           memory               = "16 GB",
-	           tools                = tools
-	      }
+	  call BwaMem
+	  {
+	     input:
+	       fastq1               = fastq_pair.left,
+	       fastq2               = fastq_pair.right,
+	       bwa_commandline      = bwa_commandline,
+	       output_bam_basename  = base_name + "." + sampleName + ".unmerged",
+	       ref_fasta            = ref_fasta,
+	       ref_dict             = ref_dict,
+	       ref_fasta_index      = ref_fasta_index,
+	       ref_bwt              = ref_bwt,
+	       ref_sa               = ref_sa,
+	       ref_amb              = ref_amb,
+	       ref_ann              = ref_ann,
+	       ref_pac              = ref_pac,
+	       cpu                  = bwa_threads,
+	       memory               = "16 GB",
+	       tools                = tools
+	  }
 	  
-	      call MergeBamAlignment
-	      {
-	         input:
-	           alignedBAM          = BwaMem.output_bam,
-	           uBAM                = Fastq_to_uBAM_sort.output_bam,
-	           uBAM_index          = Fastq_to_uBAM_sort.output_bam_index,
-	           output_bam_basename = base_name + "." + sampleName + "_" + i + "merged.aligned",
-	           ref_fasta           = ref_fasta,
-	           ref_dict            = ref_dict,
-	           ref_fasta_index     = ref_fasta_index,
+	  call MergeBamAlignment
+	  {
+	     input:
+	       alignedBAM          = BwaMem.output_bam,
+	       uBAM                = Fastq_to_uBAM_sort.output_bam,
+	       uBAM_index          = Fastq_to_uBAM_sort.output_bam_index,
+	       output_bam_basename = base_name + "." + sampleName + "_" + i + "merged.aligned",
+	       ref_fasta           = ref_fasta,
+	       ref_dict            = ref_dict,
+	       ref_fasta_index     = ref_fasta_index,
                ref_bwt             = ref_bwt,
                ref_sa              = ref_sa,
                ref_amb             = ref_amb,
                ref_ann             = ref_ann,
                ref_pac             = ref_pac,
-	           bwa_version         = GetBwaVersion.version,
-	           bwa_mem_commandline = bwa_commandline,
+	       bwa_version         = GetBwaVersion.version,
+	       bwa_mem_commandline = bwa_commandline,
                tools               = tools,
                gatk_version        = gatk_version,
                tmp_dir             = tmp_dir
-	      }
-              # Should sort anyway?
-              #call SortSam_byQuery as MergeAlignmentSort
-              #{
-              #   input:
-              #     input_bam           = MergeBamAlignment.output_bam,
-              #     output_bam_basename = "sorted_aligned_" + base_name + sampleName + "." + i,
-              #     compressionLvl      = 5,
-              #     cpus                = 8,
-              #     sambamba            = tools + "/sambamba",
-              #     flag                = "-n"
-              #}
+	  }
 	  
+          # Should sort anyway?
+          #call SortSam_byQuery as MergeAlignmentSort
+          #{
+          #   input:
+          #     input_bam           = MergeBamAlignment.output_bam,
+          #     output_bam_basename = "sorted_aligned_" + base_name + sampleName + "." + i,
+          #     compressionLvl      = 5,
+          #     cpus                = 8,
+          #     sambamba            = tools + "/sambamba",
+          #     flag                = "-n"
+          #}	  
       }
 
       call MarkDuplicatesSpark
