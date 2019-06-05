@@ -508,44 +508,6 @@ workflow wgs_downstream
   }
 }
 
-task ConsolidateGVCFs
-{
-   String gatk_launch
-   Array[String] gvcfs
-   String interval
-   String workflow_id
-   String ref
-   String out_basename
-   String dbSNP_vcf
-
-   command
-   {
-      ${gatk_launch} --java-options "-Xms1g -XX:ParallelGCThreads=1" CombineGVCFs \
-        -R ${ref} \
-        -V ${sep=' -V ' gvcfs} \
-        -L ${interval} \
-        -D ${dbSNP_vcf} \
-        -ip 200 \
-        -O ${out_basename}.g.vcf.gz
-
-      #${gatk_launch} --java-options "-Xms1g -XX:ParallelGCThreads=1" CombineGVCFs \
-      echo ${workflow_id}
-   }
-
-   runtime
-   {
-      cpu: 1
-      memory: "1500 MB"
-   }
-
-   output
-   {
-      File gvcf_out = "${out_basename}.g.vcf.gz"
-      File gvcf_idx_out = "${out_basename}.g.vcf.gz.tbi"
-   }
-}
-
-
 task DB_Import
 {
   String directory_to_search
