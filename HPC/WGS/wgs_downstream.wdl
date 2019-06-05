@@ -61,6 +61,7 @@ workflow wgs_downstream
    Int family_size
 
    String v_env_path_activation
+   String gvcf_naming_pattern
 
    scatter (index in range(length(chr_intervals)))
    {
@@ -90,7 +91,8 @@ workflow wgs_downstream
            memory = "16000 MB",
            interval = chr_intervals[i],
            dbsnp = dbsnp_vcf,
-           dbsnp_ind = dbsnp_vcf_index
+           dbsnp_ind = dbsnp_vcf_index,
+           gvcf_naming_pattern = gvcf_naming_pattern
       }
       
       call GenotypeGVCFs
@@ -1417,11 +1419,13 @@ task CombineGVCFs
    String interval
    File dbsnp
    File dbsnp_ind
+   
+   String gvcf_naming_pattern
 
    command
    <<<
         echo ${run_id}
-        find ${directory_to_search} -not -path '*/\.*' -not -path '*test*' -name "${chr_to_get}.gvcf.gz" -type f -exec echo -V {} \; > variants.txt && \
+        find ${directory_to_search} -not -path '*/\.*' -not -path '*test*' -name "${chr_to_get}.${gvcf_naming_pattern}" -type f -exec echo -V {} \; > variants.txt && \
         value=`cat variants.txt`
 
         ${tools}/gatk-${gatk_version}/gatk --java-options "-Xms2g -XX:ParallelGCThreads=1" CombineGVCFs \
