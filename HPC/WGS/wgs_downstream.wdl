@@ -893,13 +893,36 @@ task ProcessBayesDeNovoSt1Res
 task ProcessBayesDeNovoSt2Res
 {
    File res
-   File script
    String docker
    String memory
 
    command
    <<<
-     python ${script} ${res} 2 > bayes_de_novo2_calls.txt
+     python <<CODE
+     import re;
+     
+     result_file = open("bayes_de_novo2_calls.txt", "w+");
+     DE_NOVO_CALL_PATT = re.compile(r'^\d+\)\s+(?P<CHROM>\S+)\s+(?P<POS>\d+)\s+(?P<REF>[ACGT]+)\s+(?P<ALT>[ACGT,]+).*?PP=(?P<PP>\S+)', re.M);
+
+     list_of_tuples = [];
+     with open("${res}", "r") as f:
+       call_iter = DE_NOVO_CALL_PATT.finditer(f.read());
+
+     for call in call_iter:
+       site = (call.group('CHROM'),
+               int(call.group('POS')),
+               call.group('REF'),
+               call.group('ALT').split(','));
+       prob = float(call.group('PP'));
+
+       if prob >= 0.01:
+         call_tuple = (site, prob, 'BGM_BAYES_DE_NOVO');
+         list_of_tuples.append(call_tuple);
+         
+     for result in list_of_tuples:
+       print >> result_file, result
+     result_file.close();
+     CODE
    >>>
 
    runtime
