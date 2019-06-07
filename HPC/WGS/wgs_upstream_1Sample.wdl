@@ -49,13 +49,9 @@ workflow wgs_upstream
          input:
            tools = tools
       }
-   
-      #String key_sampleName         = sampleName
-      #Pair[File, File] value_fastqs = (fastq1, fastq2)
 
       scatter(index in range(length(fastqs)))
       {
-         #Int i = index
          Pair[File, File] fq_pair = fastqs[index]
 
          call SplitFQ_parallel as SplitFQ1
