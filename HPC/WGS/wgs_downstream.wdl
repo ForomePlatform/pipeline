@@ -277,7 +277,6 @@ workflow wgs_downstream
         call ProcessBayesDeNovoSt1Res
         {
            input:
-             res = BgmBayesDeNovo_stage1.stage_one_out,
              docker = "timuris/python2",
              memory = "1024 MB",
              script = tools + "/processBayesDeNovo.py"
@@ -847,13 +846,35 @@ task ProcessBgmCompHetRes
 task ProcessBayesDeNovoSt1Res
 {
    File res
-   File script
    String docker
    String memory
 
    command
    <<<
-     python ${script} ${res} 1 > bayes_de_novo1_calls.txt 
+     python <<CODE
+     import re;
+     
+     result_file = open("bayes_de_novo1_calls.txt", "w+");
+     DE_NOVO_VCF_CALL_PATT = re.compile(r'^(?P<CHROM>\S+)\s+(?P<POS>\d+)\s+.+\s+(?P<REF>[ACGT]+)\s+(?P<ALT>[ACGT,]+).*?P_denovo=(?P<PP>\d\.\d+).+', re.M);
+     with open("${res}", "r") as f:
+       call_iter = DE_NOVO_VCF_CALL_PATT.finditer(f.read());
+       
+     list_of_tuples = [];
+     for call in call_iter:
+       site = (call.group('CHROM'),
+               int(call.group('POS')),
+               call.group('REF'),
+               call.group('ALT').split(','));
+       prob = float(call.group('PP'));       
+       
+       if prob >= 0.01:
+         call_tuple = (site, prob, 'BGM_BAYES_DE_NOVO');
+         list_of_tuples.append(call_tuple);
+         
+     for result in list_of_tuples:
+       print >> result_file, result
+     result_file.close();
+     CODE
    >>>
 
    runtime
