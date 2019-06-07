@@ -313,7 +313,6 @@ workflow wgs_downstream
              in_vcf = SplitVcfByChr.vcf,
              fam    = fam,
              id     = 0,
-             py_script = tools + "/ab_caller.py",
              output_name = "autosomalDominant.calls"
         }
 
@@ -323,7 +322,6 @@ workflow wgs_downstream
              in_vcf = SplitVcfByChr.vcf,
              fam    = fam,
              id     = 1,
-             py_script = tools + "/ab_caller.py",
              output_name = "homozygousRecessive.calls"
         }
 
@@ -333,7 +331,6 @@ workflow wgs_downstream
              in_vcf      = SplitVcfByChr.vcf,
              fam         = fam,
              id          = 2,
-             py_script   = tools + "/ab_caller.py",
              output_name = "deNovoCaller.calls"
         }
 
@@ -343,7 +340,6 @@ workflow wgs_downstream
              in_vcf      = SplitVcfByChr.vcf,
              fam         = fam,
              id          = 3,
-             py_script   = tools + "/ab_caller.py",
              output_name = "compoundHeterozygous.calls"
         }
 
@@ -1509,13 +1505,262 @@ task ABCaller
 {
    File in_vcf
    File fam
-   File py_script
    Int id
    String output_name
 
    command
    {
-      python ${py_script} ${in_vcf} ${fam} ${id} > ${output_name}
+      python <<CODE
+      from __future__ import division
+      from collections import namedtuple
+      import vcf as pyvcf
+
+      res_file = open("${output_name}", "w+");
+
+      def all_gts_match(sample_gts, *gts):
+          return all(gt in gts for gt in sample_gts)
+
+      FAM_TUPLE = namedtuple('fam_structure', ['samples', 'affected', 'unaffected', 'de_novo'])
+
+      def parse_fam_file(fam_file):
+
+          samples = dict()
+
+          for line in fam_file:
+              if line.startswith('#'):
+                  continue
+              try:
+                  _, id, fid, mid, _, pheno_code = line.split()
+                  mid = None if mid in ('0', '-9')  else mid
+                  fid = None if fid in ('0', '-9')  else fid
+                  affected = (pheno_code == '2')
+                  samples[id] = {'fid': fid,
+                                 'mid': mid,
+                                 'affected': affected,
+                                 'in_vcf': True}
+              except:
+                  raiseException('Could not parse fam file line: {}'
+                                  .format(line.strip()))
+
+          all_mids = {s['mid'] for s in samples.values() if s['mid']}
+          all_fids = {s['fid'] for s in samples.values() if s['fid']}
+          unknown_ids = (all_mids | all_fids) - set(samples.keys())
+          for id in unknown_ids:
+              samples[id] = {'mid': None,
+                             'fid': None,
+                             'affected': False,
+                             'in_vcf': False}
+
+          affected_ids = [id for id, s in samples.items() if s['affected']]
+          unaffected_ids = [id for id, s in samples.items()
+                            if s['in_vcf'] and not s['affected']]
+          naffected = len(affected_ids)
+          if naffected <= 0:
+              raiseException('At least one affected sample should be present')
+
+          de_novo = None
+          if naffected == 1:
+              id, mid, fid = [(id, s['mid'], s['fid']) for id, s in samples.items()
+                                 if s['affected']].pop()
+              if (mid is not None and fid is not None and
+                  samples[mid]['in_vcf'] and samples[fid]['in_vcf']):
+                  de_novo = (id, mid, fid)
+
+          return FAM_TUPLE(samples, affected_ids, unaffected_ids, de_novo)
+
+
+      def make_ab_call(reads):
+          """
+          0-5% alt reads: 0/0
+          5-85% alt reads: 0/1
+          80-100% alt reads: 1/1
+          """
+
+          nref = reads[0]
+          nalt = sum(reads[1:])
+
+          if nref + nalt == 0:
+              return None
+
+          prop_alt = nalt / (nref + nalt)
+
+          if prop_alt <= 0.05:
+              return '0/0'
+          if 0.05 < prop_alt <= 0.85:
+              return '0/1'
+          if 0.85 < prop_alt:
+              return '1/1'
+
+
+      def recall_genotypes(record):
+          for call in record.samples:
+              ad = getattr(call.data, 'AD', None)
+              ad = map(int, ad);
+              if not ad:
+                  continue
+              new_gt = make_ab_call(ad)
+
+              if new_gt:
+                  call.gt_alleles = new_gt.split('/')
+                  call.gt_nums = new_gt
+                  call.called = True
+                  call.data = call.data._replace(GT=new_gt)
+
+
+      class ABCaller(object):
+
+          UNRELATED_AF_THRESHOLD = 0.1
+          callerName = "";
+
+          def __init__(self, vcf_file, fam_file, callerName = "Abstract"):
+              self.reader = pyvcf.Reader(filename=vcf_file)
+              self.callerName = callerName;
+              with open(fam_file) as f:
+                  self.fam_structure = parse_fam_file(f)
+              self.unrelated_ids = set(self.reader.samples) - set(self.fam_structure.affected + self.fam_structure.unaffected)
+
+          def case_gts(self, call_dict):
+              affected_gts = [call_dict[id]
+                              for id in self.fam_structure.affected]
+              unaffected_gts = [call_dict[id]
+                                for id in self.fam_structure.unaffected]
+              return affected_gts, unaffected_gts
+
+          def unrelated_af(self, call_dict):
+              unrelated_gts = [call_dict[id]
+                               for id in self.unrelated_ids
+                               if call_dict[id] is not None]
+              if not unrelated_gts:
+                  return 0.
+              return sum(unrelated_gts) / (2. * len(unrelated_gts))
+
+          def __iter__(self):
+              for record in self.reader:
+                  recall_genotypes(record)
+                  call_dict = {s.sample: s.gt_type for s in record.samples}
+
+                  if self.unrelated_af(call_dict) > self.UNRELATED_AF_THRESHOLD:
+                      continue
+                  call = self.make_call(call_dict)
+                  if not call:
+                      continue
+                  yield (
+                      record.CHROM,
+                      record.POS,
+                      record.REF,
+                      [str(alt) for alt in record.ALT]
+                  ), call, self.callerName;
+
+          def make_call(self, call_dict):
+                  raise NotImplementedError
+
+
+      class AutosomalDominantCaller(ABCaller):
+
+          CALLER_NAME = 'BGM_AUTO_DOM'
+          CALLER_NUMBER = 1
+          CALLER_TYPE = 'Flag'
+          CALLER_DESC = 'Autosomal dominant by BGM allele balance caller'
+
+          def __init__(self, vcfFile, famFile):
+              ABCaller.__init__(self, vcfFile, famFile, self.CALLER_NAME);
+
+          def make_call(self, call_dict):
+              affected_gts, unaffected_gts = self.case_gts(call_dict)
+              return (all_gts_match(affected_gts, 1, 2) and
+                      all_gts_match(unaffected_gts, 0, None))
+
+
+      class HomozygousRecessiveCaller(ABCaller):
+
+          CALLER_NAME = 'BGM_HOM_REC'
+          CALLER_NUMBER = 1
+          CALLER_TYPE = 'Flag'
+          CALLER_DESC = 'Homozygous recessive by BGM allele balance caller'
+
+          def __init__(self, vcfFile, famFile):
+              ABCaller.__init__(self, vcfFile, famFile, self.CALLER_NAME);
+
+          def make_call(self, call_dict):
+              affected_gts, unaffected_gts = self.case_gts(call_dict)
+              return (all_gts_match(affected_gts, 2) and
+                      all_gts_match(unaffected_gts, 0, 1, None))
+
+
+      class DeNovoCaller(ABCaller):
+
+          CALLER_NAME = 'BGM_DE_NOVO'
+          CALLER_NUMBER = 1
+          CALLER_TYPE = 'Flag'
+          CALLER_DESC = 'De novo by BGM allele balance caller'
+
+          def __init__(self, vcfFile, famFile):
+              ABCaller.__init__(self, vcfFile, famFile, self.CALLER_NAME);
+
+          def make_call(self, call_dict):
+              if not self.fam_structure.de_novo:
+                  return False
+              affected_gts, unaffected_gts = self.case_gts(call_dict)
+              return (all_gts_match(affected_gts, 1, 2) and
+                      all_gts_match(unaffected_gts, 0, None))
+
+
+      class CompoundHeterozygousCaller(ABCaller):
+
+          CALLER_NAME = 'BGM_CMPD_HET'
+          CALLER_NUMBER = 1
+          CALLER_TYPE = 'Integer'
+          CALLER_DESC = 'Compound heterozygous by BGM allele balance caller'
+
+          def __init__(self, vcfFile, famFile):
+              ABCaller.__init__(self, vcfFile, famFile, self.CALLER_NAME);
+
+          def make_call(self, call_dict):
+              affected_gts, unaffected_gts = self.case_gts(call_dict)
+
+              if not all_gts_match(affected_gts, 1, 2):
+                  return False
+
+              # bitwise flag to represent which unaffected samples have the variant
+              # e.g. if the unaffected_gts are [0, 1, 0, 1] (the 2nd and 4th samples
+              # have the variant), value = 1<<2 + 1<<4 = 2^1 + 2^4 = 18.
+              # xBrowse will use bitwise AND operator (&) to select pairs of variants
+              # after appropriate filtering such that no unaffected sample has both
+              # variants (var1_value & var2_value == 0)
+              value = sum(1 << i for i, gt in enumerate(unaffected_gts)
+                          if gt in (1, 2))
+              return value
+
+      vcfFile  = "${in_vcf}";
+      famFile  = "${fam}";
+      callerId = int("${id}");
+
+      listOfResults = [];
+
+      if(callerId == 0):
+        adCaller = AutosomalDominantCaller(vcfFile, famFile);
+        for call in adCaller:
+          listOfResults.append(call);
+
+      elif(callerId == 1):
+        hrCaller = HomozygousRecessiveCaller(vcfFile, famFile);
+        for call in hrCaller:
+          listOfResults.append(call);
+
+      elif(callerId == 2):
+        deNovoCaller = DeNovoCaller(vcfFile, famFile);
+        for call in deNovoCaller:
+          listOfResults.append(call);
+
+      elif(callerId == 3):
+        cmpHetCaller = CompoundHeterozygousCaller(vcfFile, famFile);
+        for call in cmpHetCaller:
+          listOfResults.append(call);
+      
+      for result in listOfResults:
+        print >> res_file, result
+      res_file.close();
+      CODE
    }
 
    runtime
