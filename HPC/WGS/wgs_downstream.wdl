@@ -277,9 +277,9 @@ workflow wgs_downstream
         call ProcessBayesDeNovoSt1Res
         {
            input:
+             res = BgmBayesDeNovo_stage1.stage_one_out,
              docker = "timuris/python2",
-             memory = "1024 MB",
-             script = tools + "/processBayesDeNovo.py"
+             memory = "1024 MB"
         }
 
         call BgmBayesDeNovo_stage2
@@ -304,8 +304,7 @@ workflow wgs_downstream
            input:
              res = BgmBayesDeNovo_stage2.st2_res,
              docker = "timuris/python2",
-             memory = "1024 MB",
-             script = tools + "/processBayesDeNovo.py"
+             memory = "1024 MB"
         }
 
         call ABCaller as AutosomalDominantCaller
