@@ -392,7 +392,6 @@ workflow wgs_downstream
            input:
              res = BgmHomRec.out,
              docker = "timuris/python2",
-             script = tools + "/processHomRec.py",
              memory = "1024 MB",
              cpu = 1
         }
@@ -787,7 +786,6 @@ task MergeVcfCalls
 task ProcessHomRecRes
 {
    File res
-   File script
 
    String docker
    String memory
@@ -795,7 +793,30 @@ task ProcessHomRecRes
 
    command
    <<<
-     python ${script} ${res} > hom_rec_calls.txt
+     python <<CODE
+     import re;
+     
+     HOM_REC_CALL_PATT = re.compile(r'^(?P<CHROM>\S+)\s+(?P<POS>\d+)\s+(\S+)\s+(?P<REF>[ACGT]+)\s+(?P<ALT>[ACGT,]+).*?P_hom_rec=(?P<PROB>[^;\n]+)', re.M);
+     res_file = open("hom_rec_calls.txt", "w+");
+     
+     with open("${res}", "r") as f:
+       call_iter = HOM_REC_CALL_PATT.finditer(f.read());
+
+     listOfCalledTuples = [];
+     for call in call_iter:
+       site = (call.group('CHROM'),
+               int(call.group('POS')),
+               call.group('REF'),
+               call.group('ALT').split(','));
+       prob = float(call.group('PROB');
+       if prob > 0.5:
+         call_tuple = (site, prob, 'BGM_BAYES_HOM_REC');
+         listOfCalledTuples.append(call_tuple);
+         
+     for call in listOfCalledTuples:
+       print >> res_file, call;
+     res_file.close();
+     CODE
    >>>
 
    runtime
