@@ -127,6 +127,7 @@ workflow wgs_downstream
        vcfs_ind = GenotypeGVCFs.output_vcf_idx,
        out_base_name = "genotyped",
        out_extension = "vcf.gz",
+       tools = tools,
        num_threads = 2,
        memory = "4096 MB",
        docker = "timuris/bcftools:bgzip"
@@ -661,6 +662,8 @@ task MergeGenotypeRes
    String out_base_name
    String out_extension
 
+   String tools
+
    Int num_threads
    String memory
    String docker
@@ -668,8 +671,8 @@ task MergeGenotypeRes
    command
    {
       set -e
-      bcftools concat --threads ${num_threads} -a -D -O z -o ${out_base_name}.${out_extension} ${sep=' ' vcfs}
-      tabix -p vcf ${out_base_name}.${out_extension}
+      ${tools}/bcftools concat --threads ${num_threads} -a -D -O z -o ${out_base_name}.${out_extension} ${sep=' ' vcfs}
+      ${tools}/tabix -p vcf ${out_base_name}.${out_extension}
    }
 
    runtime
