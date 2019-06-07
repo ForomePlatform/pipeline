@@ -209,6 +209,7 @@ workflow wgs_downstream
           in_vcf = ApplyRecalibration.recalibrated_vcf,
           in_vcf_index = ApplyRecalibration.recalibrated_vcf_index,
           chr = chr,
+          tools = tools,
           memory = "2 GB",
           docker = "timuris/bwa"
      }
@@ -1055,14 +1056,16 @@ task SplitVcfByChr
    File in_vcf_index
    String chr
    
+   String tools
+   
    String docker
    String memory
 
    command
    {
-      tabix -h ${in_vcf} ${chr} > ${chr}.vcf
-      bgzip -c ${chr}.vcf > ${chr}.vcf.gz
-      tabix -p vcf ${chr}.vcf.gz
+      ${tools}/tabix -h ${in_vcf} ${chr} > ${chr}.vcf
+      ${tools}/bgzip -c ${chr}.vcf > ${chr}.vcf.gz
+      ${tools}/tabix -p vcf ${chr}.vcf.gz
    }
 
    runtime
