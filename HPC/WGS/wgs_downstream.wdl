@@ -405,12 +405,10 @@ workflow wgs_downstream
              homozygousRecessive_res = HomozygousRecessiveCaller.calls,
              autosomalDominant_res = AutosomalDominantCaller.calls,
              bgmCompoundHet_res = ProcessBgmCompHetRes.comp_het_calls,
-             #bgmDeNovo_res = ProcessBayesDeNovoSt1Res.bayes_deNovo_calls_st1,
              bgmDeNovo_res = ProcessBayesDeNovoSt2Res.bayes_deNovo_calls_st2,
              vcf = ApplyRecalibration.recalibrated_vcf,
              vcf_index = ApplyRecalibration.recalibrated_vcf_index,
              docker = "timuris/python2",
-             py_script = call_gathering_py,
              memory = "1024 MB",
              cpu = 1
         }
@@ -628,15 +626,98 @@ task GatherCalls
    File bgmDeNovo_res
    File vcf
    File vcf_index
-   File py_script
    String docker
    String memory
    Int cpu
 
    command
-   {
-      python ${py_script} ${deNovo_res} ${bgmHomRec_res} ${compoundHeterozygous_res} ${autosomalDominant_res} ${bgmDeNovo_res} ${homozygousRecessive_res} ${autosomalDominant_res} ${vcf}
-   }
+   <<<
+      python <<CODE
+      import vcf as pyvcf;
+
+      def add_headers(reader):
+        info = pyvcf.parser._Info('BGM_AUTO_DOM', 1, 'Flag', 'Autosomal dominant by BGM allele balance caller', None, None);
+        reader.infos[info.id] = info;
+
+        info = pyvcf.parser._Info('BGM_HOM_REC', 1, 'Flag', 'Homozygous recessive by BGM allele balance caller', None, None);
+        reader.infos[info.id] = info;
+
+        info = pyvcf.parser._Info('BGM_DE_NOVO', 1, 'Flag', 'De novo by BGM allele balance caller', None, None);
+        reader.infos[info.id] = info;
+
+        info = pyvcf.parser._Info('BGM_CMPD_HET', 1, 'Integer', 'Compound heterozygous by BGM allele balance caller', None, None);
+        reader.infos[info.id] = info;
+
+        info = pyvcf.parser._Info('BGM_BAYES_CMPD_HET', 1, 'Float', 'Probability of compund het by BGM Bayes caller', None, None);
+        reader.infos[info.id] = info;
+
+        info = pyvcf.parser._Info('BGM_BAYES_DE_NOVO', 1, 'Float', 'Probability of de novo by BGM Bayes caller', None, None);
+        reader.infos[info.id] = info;
+
+        info = pyvcf.parser._Info('BGM_BAYES_HOM_REC', 1, 'Float', 'Probability of hom rec by BGM Bayes caller', None, None);
+        reader.infos[info.id] = info;
+
+      def process_site(site, vcf_writer, listOfCallers):
+        site_split = site.split("[");
+        alts = list(site_split[1].replace("]", "").split(", "));
+        
+        site_split = site_split[0].split(", ")[:-1];
+        record = pyvcf.model._Record('', 0, None, '', [None], None, None, None, None, None);
+
+        record.CHROM = site_split[0];
+        record.POS = site_split[1];
+        record.REF = site_split[2];
+        record.ALT = [pyvcf.model._Substitution(alt) for alt in alts]
+        record.INFO = INFO=listOfCallers;
+
+        if "chr" not in record.CHROM:
+          record.CHROM = "chr" + record.CHROM;
+
+        vcf_writer.write_record(record)
+      #################################
+      deNovoCallerRes         = "${deNovo_res}";
+      bgmHomRecRes            = "${bgmHomRec_res}";
+      compoundHeterozygousRes = "${compoundHeterozygous_res}";
+      autosomalDominantRes    = "${autosomalDominant_res}";
+      bgmBayesDeNovoRes       = "${bgmDeNovo_res}";
+      homRecRes               = "${homozygousRecessive_res}";
+      bgmCompoundHetRes       = "${autosomalDominant_res}";
+      vep_vcf                 = "${vcf}";
+
+      vcf_reader = pyvcf.Reader(filename=vep_vcf);
+      vcf_reader.infos = dict();
+      vcf_reader.samples = list();
+
+      add_headers(vcf_reader);
+      calls_vcf = open('calls.vcf', 'w+');
+      vcf_writer = pyvcf.Writer(calls_vcf, template=vcf_reader);
+
+      site_callers = {};
+      listOfResults = [bgmCompoundHetRes, homRecRes, compoundHeterozygousRes, bgmHomRecRes, deNovoCallerRes, autosomalDominantRes, bgmBayesDeNovoRes];
+
+      for result in listOfResults:
+        with open(result) as f:
+          line = f.readline();
+          while line:
+            line_split = line[1:-2].replace("'", "").split("), ");
+            site = line_split[0].replace("(", "");
+
+            if not site in site_callers:
+              site_callers[site] = {};
+
+            callerName = line_split[1].split(", ")[-1].replace("'", "");
+            callerValue = line_split[1].split(", ")[-2].replace("'", "");
+
+            if callerValue == 'True':
+              callerValue = True;
+
+            site_callers[site][callerName] = callerValue;
+            line = f.readline();
+
+      for key in sorted(site_callers.iterkeys(), key=lambda k: int(k.split(", ")[1])):
+        process_site(key, vcf_writer, site_callers[key]);
+      CODE
+   >>>
 
    runtime
    {
