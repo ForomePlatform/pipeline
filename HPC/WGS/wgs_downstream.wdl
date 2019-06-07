@@ -368,7 +368,6 @@ workflow wgs_downstream
              res = BgmCompoundHetCaller.out,
              docker = "timuris/python2",
              memory = "1024 MB",
-             script = tools + "/processBgmCompHet.py",
              cpu = 1,
              vcf = VepAnnotate.out_vcf
         }
@@ -816,7 +815,6 @@ task ProcessBgmCompHetRes
 {
    File res
    File vcf
-   File script
 
    String docker
    String memory
@@ -824,9 +822,50 @@ task ProcessBgmCompHetRes
 
    command
    <<<
-     set -e
-     zcat ${vcf} > decompressed.vcf
-     python ${script} ${res} decompressed.vcf > bgm_comp_het_calls.txt
+     python <<CODE
+     import re;
+     import sys;
+     import vcf as pyvcf;
+     import os;
+     
+     cmd = "zcat ${vcf} > decompressed.vcf";
+     os.system(cmd);
+     res_file = open("bgm_comp_het_calls.txt", "w+");
+     
+     CMPD_HET_CALL_PATT = re.compile(r'^Probty=(?P<PROB>\S+)\s+LOC=(?P<CHROM>\S+)\s+(?P<POS>\d+)', re.M);
+
+     with open("${res}", 'r') as f:
+       call_iter = CMPD_HET_CALL_PATT.finditer(f.read());
+
+     reader = pyvcf.Reader(filename=sys.argv[2]);
+     read_iter = reader.__iter__();
+
+     listOfCalls = [];
+     for call in call_iter:
+       listOfCalls.append(call);
+
+     listOfCalls.sort(key=lambda x: int(x.group('POS')));     
+     lisOfCalledTuples = [];
+     
+     for call in listOfCalls:
+       while True:
+         record = read_iter.next();
+         if int(record.POS) == int(call.group('POS')):
+           break;
+
+       site = ("chr" + call.group('CHROM'),
+               int(call.group('POS')),
+               record.REF,
+               [str(alt) for alt in record.ALT]);
+       prob = float(call.group('PROB'));
+       if prob > 0.5:
+         call_tuple = (site, prob, 'BGM_BAYES_CMPD_HET');
+         lisOfCalledTuples.append(call_tuple);
+     
+     for call in listOfCalledTuples:
+       print >> res_file, call;
+     res_file.close();
+     CODE
    >>>
 
    runtime
