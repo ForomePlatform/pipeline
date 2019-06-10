@@ -1,14 +1,11 @@
-# Portable Pipeline for Whole Exome and Genome Sequencing
+<!-- ABOUT THE PROJECT -->
+## Portable Pipeline for Whole Exome and Genome Sequencing
 
-This is a portable workflow for converting the raw sequencing data in FASTQ format to results usable in a clinical environment. In combination with the Forome Anfisa Variant Curation Tool, it can yield a clinically actionable report.
+This is a portable workflow for converting the raw sequencing data in FASTQ format to results usable in a clinical environment. 
+In combination with the Forome Anfisa Variant Curation Tool, it can yield a clinically actionable report.
 
-### Prerequisites for local machine
+### Prerequisites
 
-This workflow uses the following tools
-
-```
- Markup : * gatk4
-          * samtools
-```
-
-
+This workflow uses the following tools:
+ * gatk4
+ * samtools
