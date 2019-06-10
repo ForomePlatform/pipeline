@@ -416,6 +416,7 @@ workflow wgs_downstream
              memory = "2 GB",
              cpu = 1,
              vcf = GatherCalls.vcf_out,
+             tools = tools,
              out_base_name = "calls." + chr
         }
 
@@ -428,6 +429,7 @@ workflow wgs_downstream
              vcf_index = VepAnnotate.out_vcf_index,
              out_base_name = chr + ".calls",
              docker = "timuris/bcftools:bgzip",
+             tools = tools,
              memory = "2048 MB",
              cpu = 1,
         }
@@ -805,10 +807,12 @@ task Bgzip
   String memory
   Int cpu  
 
+  String tools
+
   command
   {
-     bgzip -c ${vcf} > ${out_base_name}.vcf.gz 
-     tabix -p vcf ${out_base_name}.vcf.gz
+     ${tools}/bgzip -c ${vcf} > ${out_base_name}.vcf.gz 
+     ${tools}/tabix -p vcf ${out_base_name}.vcf.gz
   }
 
   runtime
@@ -833,6 +837,7 @@ task MergeVcfCalls
    File vcf_index
 
    String out_base_name
+   String tools
 
    String docker
    String memory
@@ -841,9 +846,9 @@ task MergeVcfCalls
    command
    {
       set -e
-      bcftools annotate -a ${calls} -c INFO ${vcf} > ${out_base_name}.vcf
-      bgzip -c ${out_base_name}.vcf > ${out_base_name}.vcf.gz
-      tabix -p vcf ${out_base_name}.vcf.gz      
+      ${tools}/bcftools annotate -a ${calls} -c INFO ${vcf} > ${out_base_name}.vcf
+      ${tools}/bgzip -c ${out_base_name}.vcf > ${out_base_name}.vcf.gz
+      ${tools}/tabix -p vcf ${out_base_name}.vcf.gz      
    }
 
    runtime
