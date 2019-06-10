@@ -541,7 +541,7 @@ task BwaMem
     bwa_threads=${cpu}
     
     ${tools}/bwa/bwa-0.7.17/${bwa_commandline} ${fastq1} ${fastq2} | \
-    samtools view -1 -@ ${cpu} - > ${output_bam_basename}.bam 2>> bwa_err.log
+    ${tools}/samtools view -1 -@ ${cpu} - > ${output_bam_basename}.bam 2>> bwa_err.log
   }
 
   runtime
