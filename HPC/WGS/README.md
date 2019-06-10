@@ -7,5 +7,5 @@ In combination with the Forome Anfisa Variant Curation Tool, it can yield a clin
 ### Prerequisites
 
 This workflow uses the following tools:
- * gatk4
- * samtools
+ * [GATK4](https://software.broadinstitute.org/gatk/) 
+ * [Samtools](http://www.htslib.org/)
