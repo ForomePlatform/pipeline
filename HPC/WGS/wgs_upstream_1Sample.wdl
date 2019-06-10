@@ -1,3 +1,15 @@
+###################################################################################################
+# This workflow uses the following tools:
+#	1) python2
+#	2) bwa-0.7.17 - http://bio-bwa.sourceforge.net/
+#	3) zcat       - https://linux.die.net/man/1/zcat
+#	4) split      - http://man7.org/linux/man-pages/man1/split.1.html
+#	5) parallel   - https://www.gnu.org/software/parallel/man.html
+#	6) find       - http://man7.org/linux/man-pages/man1/find.1.html
+#	7) gatk4      - https://software.broadinstitute.org/gatk/documentation/tooldocs/4.1.2.0/
+#	8) samtools   - http://www.htslib.org/
+#	9) sambamba   - http://lomereiter.github.io/sambamba/
+###################################################################################################
 workflow wgs_upstream
 {
       #RESOURCES SECTION
@@ -58,37 +70,37 @@ workflow wgs_upstream
          call SplitFQ_parallel as SplitFQ1
          {
             input:
-              fq = fq_pair.left,
+              fq                = fq_pair.left,
 	      path_to_split_bin = path_to_split_bin,
-              suffix = "1",
-              case_name = base_name + sampleName + "_" + index,
-              cpu = 4,
-              memory = "1 GB"
+              suffix            = "1",
+              case_name         = base_name + sampleName + "_" + index,
+              cpu               = 4,
+              memory            = "1 GB"
          }
 
          call SplitFQ_parallel as SplitFQ2
          {
             input:
-              fq = fq_pair.right,
+              fq                = fq_pair.right,
 	      path_to_split_bin = path_to_split_bin,
-              suffix = "2",
-              case_name = base_name + sampleName + "_" + index,
-              cpu = 4,
-              memory = "1 GB"
+              suffix            = "2",
+              case_name         = base_name + sampleName + "_" + index,
+              cpu               = 4,
+              memory            = "1 GB"
          }
       }
 
       call GatherFiles as GatherFQ1
       {
          input:
-           files = SplitFQ1.fqs,
+           files  = SplitFQ1.fqs,
            suffix = "fq1"
       }
   
       call GatherFiles as GatherFQ2
       {
          input:
-           files = SplitFQ2.fqs,
+           files  = SplitFQ2.fqs,
            suffix = "fq2"
       }
       
