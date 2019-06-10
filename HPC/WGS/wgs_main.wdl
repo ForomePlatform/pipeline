@@ -83,6 +83,7 @@ workflow wgs
     File stub_file                                              #stub_file for select_first function
     
     String gvcf_naming_pattern                                  #e.g. "g.vcf.gz"
+    String path_to_split_bin                                    #path to split unix tool
 
     call GenerateCaseIdsFile
     {
@@ -125,6 +126,7 @@ workflow wgs
                                         ref_pac                          = ref_pac,
                                         tmp_dir                          = tmp_dir,
                                         tools                            = tools,
+                                        path_to_split_bin                = path_to_split_bin,
                                         gvcfs_dir                        = gvcfs_dir + "/" + base_name + key_sampleName,
                                         gatk_version                     = gatk_version
                                    }
