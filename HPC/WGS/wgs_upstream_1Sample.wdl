@@ -23,7 +23,7 @@ workflow wgs_upstream
       String base_name
       #String rg_string = "'@RG\\tID:@HS2000\\tPL:ILLUMINA\\tLB:bgm_lib\\tSM:" + base_name + sampleName + "'"	
       
-      String bwa_commandline="bwa mem -R '@RG\\tID:" + base_name + sampleName + "\\tPL:ILLUMINA\\tLB:bgm_lib\\tSM:" + base_name + sampleName + "' -K 100000000 -v 3 -t $bwa_threads -Y $bash_ref_fasta"
+      String bwa_commandline = "bwa mem -R '@RG\\tID:" + base_name + sampleName + "\\tPL:ILLUMINA\\tLB:bgm_lib\\tSM:" + base_name + sampleName + "' -K 100000000 -v 3 -t $bwa_threads -Y $bash_ref_fasta"
       
       Array[String] scattered_calling_intervals = ["chrM", "chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", "chr10", "chr11", "chr12", "chr13", "chr14", "chr15", "chr16", "chr17", "chr18", "chr19", "chr20", "chr21", "chr22", "chrX", "chrY"]
 	
@@ -37,6 +37,7 @@ workflow wgs_upstream
       String gvcfs_dir
 
       String tmp_dir 
+      String path_to_split_bin
 
       call CreateSequenceGroupingTSV
       {
@@ -58,6 +59,7 @@ workflow wgs_upstream
          {
             input:
               fq = fq_pair.left,
+	      path_to_split_bin = path_to_split_bin,
               suffix = "1",
               case_name = base_name + sampleName + "_" + index,
               cpu = 4,
@@ -68,6 +70,7 @@ workflow wgs_upstream
          {
             input:
               fq = fq_pair.right,
+	      path_to_split_bin = path_to_split_bin,
               suffix = "2",
               case_name = base_name + sampleName + "_" + index,
               cpu = 4,
@@ -946,13 +949,15 @@ task SplitFQ_parallel
   String case_name
   String suffix
 
+  String path_to_split_bin
+
   Int cpu
   String memory
 
   command
   <<<
      set -e
-     zcat ${fq} | /net/home/isaevt/bin/bin/split --additional-suffix=.fq${suffix} -l 60000000 - ${case_name}
+     zcat ${fq} | ${path_to_split_bin} --additional-suffix=.fq${suffix} -l 60000000 - ${case_name}
      parallel -j${cpu} gzip ::: *.fq${suffix}
   >>>
 
