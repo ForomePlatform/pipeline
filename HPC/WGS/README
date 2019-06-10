@@ -2,8 +2,8 @@
 
 This is a portable workflow for converting the raw sequencing data in FASTQ format to results usable in a clinical environment. In combination with the Forome Anfisa Variant Curation Tool, it can yield a clinically actionable report.
 
-<!---
-## Getting Started
+
+<!-- ## Getting Started
 
 These instructions will get you a copy of the project up and running on your local machine for development and testing purposes. See deployment for notes on how to deploy the project on a live system.
 
