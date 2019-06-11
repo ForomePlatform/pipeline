@@ -16,12 +16,21 @@ This workflow uses the following tools:
  * [tabix](http://www.htslib.org/doc/tabix.html)
  * [VEP](https://useast.ensembl.org/info/docs/tools/vep/index.html)
  * Python 2.7.9
+   * [pandas 0.18.0](https://pandas.pydata.org/pandas-docs/version/0.18.0/)
  * [BWA](http://bio-bwa.sourceforge.net/)
  * [NovoCaller](https://github.com/bgm-cwg/novoCaller)
+ * [vcf2geno](http://csg.sph.umich.edu/chaolong/LASER/index.html)
+ 
+
+Due to the legacy pipeline code structure and the cluster configuration, there are ssome constraints on the directoris structure and storage format:
+ * This workflow was created assuming that g.vcf files are split by chromosome for each sample.
+ * All g.vcf files from all of priveous runs are stored under the same root directory. This root directory is passed as an input to get a list of all available g.vcf files
+ * The alligned .bam files from all of priveous runs are also stored under the same root directory. This root directory is passed as an input to get a list of all available .bam files (at the moment, this is required for the de-novo caller).
+ * All executables and .jar files are stored under the same directory  
  
 ## Running
 
-This workflow can be run with [Cromwell](https://github.com/broadinstitute/cromwell). You can run this workflow with the following command:
+This workflow can be run with [Cromwell](https://github.com/broadinstitute/cromwell). You can run this workflow in the Cromwells command line mode with the following command:
 
 ```sh
 java -Dconfig.file=cromwell.config -jar cromwell.jar run wgs_main.wdl --inputs inputs.json
