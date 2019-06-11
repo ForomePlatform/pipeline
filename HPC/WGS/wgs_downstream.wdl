@@ -62,6 +62,8 @@ workflow wgs_downstream
 
    String v_env_path_activation
    String gvcf_naming_pattern
+   
+   String vep_exe
 
    scatter (index in range(length(chr_intervals)))
    {
@@ -226,7 +228,8 @@ workflow wgs_downstream
           output_basename = chr + ".vep",
           buffer = 50000,
           number_of_threads = 4,
-          memory = "2 GB"
+          memory = "2 GB",
+          vep_exe = vep_exe
      }
 
      if (family_size == 1)
@@ -1279,10 +1282,11 @@ task VepAnnotate
    Int number_of_threads
    Int buffer
    String memory
-
+   String vep_exe
+   
    command
    {
-      perl /net/bgm/tools/vep-85/variant_effect_predictor.pl --format vcf --force_overwrite --dir_cache ${cache_path} --dir_plugin ${plugin_path} --offline --no_stats --vcf --everything \
+      ${vep_exe} --format vcf --force_overwrite --dir_cache ${cache_path} --dir_plugin ${plugin_path} --offline --no_stats --vcf --everything \
           --plugin ExAC,${exac_path} --allele_number --input_file ${input_vcf} --output_file ${output_basename}.vcf.gz --tabix --fork ${number_of_threads} --buffer_size ${buffer}
    }
 
