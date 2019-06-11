@@ -289,13 +289,12 @@ workflow wgs_downstream
              family_bams = family_bams,
              family_bams_idx = family_bams_idx,
              dir_to_search = novo_dir_to_search,
-             case_type = "wgs",
-             case_to_exclude = run_id,
+             include_in_path = "wgs",
+             exclude_from_path = run_id,
              cpu = 1,
              memory = "1024 MB", 
              chr = chr,
              script = tools + "/pysam_prac.py",
-             bam_search_script = tools + "/findBams.py",
              v_env_path_activation = v_env_path_activation
         }
 
@@ -1086,14 +1085,13 @@ task BgmBayesDeNovo_stage2
    Array[File] family_bams_idx
    
    String dir_to_search
-   String case_type
-   String case_to_exclude
+   String include_in_path
+   String exclude_from_path
    Int cpu
    String memory
    
    String chr
    File script
-   File bam_search_script
 
    #optional
    String v_env_path_activation
@@ -1107,7 +1105,7 @@ task BgmBayesDeNovo_stage2
       fi;
       ${v_env_path_activation}
       echo -e ' ${sep='\n' family_bams}' > case.bams
-      python ${bam_search_script} ${dir_to_search} ${case_type}
+      find ${dir_to_search} -type f -name "*bam" -path "${include_in_path}" -not -path "${exclude_from_path}" > allBams.txt
       python ${script} -I ${st1_res} -U allBams.txt -T case.bams -O ${chr}.st2.res
    >>>
    
