@@ -17,6 +17,7 @@ This workflow uses the following tools:
  * [VEP](https://useast.ensembl.org/info/docs/tools/vep/index.html)
  * Python 2.7.9
    * [pandas 0.18.0](https://pandas.pydata.org/pandas-docs/version/0.18.0/)
+   * [matplotlib](https://matplotlib.org/1.5.1/contents.html?fbclid=IwAR2fohH2ja4E6-jWl3_YaPxLckdv5OsWXVButxB8bhmU46nwSshnB5cMVtI)
  * [BWA](http://bio-bwa.sourceforge.net/)
  * [NovoCaller](https://github.com/bgm-cwg/novoCaller)
  * [vcf2geno](http://csg.sph.umich.edu/chaolong/LASER/index.html)
