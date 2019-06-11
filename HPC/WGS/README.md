@@ -39,7 +39,7 @@ Due to the legacy pipeline code structure and the cluster configuration, there a
     |   |-- ..................
     |   |-- chrY.gvcf.gz
     |   |-- chrY.gvcf.gz.tbi
-    |-- case02_sample2
+    |-- case02_sample1
     |   |-- chr1.gvcf.gz
     |   |-- chr1.gvcf.gz.tbi
     |   |-- chr2.gvcf.gz
@@ -49,7 +49,13 @@ Due to the legacy pipeline code structure and the cluster configuration, there a
     |   |-- chrY.gvcf.gz.tbi
     ```
     It contains 2 subdirectories with the g.vcf files for each chromosome from 2 samples. In this example, "/data/gvcf_storage/" will be passed as an input to the workflow.
- * The alligned .bam files from all of priveous runs are also stored under the same root directory. This root directory is passed as an input to get a list of all available .bam files (at the moment, this is required for the de-novo caller).
+ * The alligned .bam files from all of priveous runs are also stored under the same root directory. This root directory is passed as an input to get a list of all available .bam files (at the moment, this is required for the de-novo caller). For example, here is the tree for the directory /data/bam_storage/:
+    ```sh
+    |-- case01_sample1.bam
+    |-- case01_sample1.bam.bai
+    |-- case02_sample1.bam
+    |-- case02_sample1.bam.bai
+    ```
  * All executables and .jar files are stored under the same directory  
  
 ## Running
