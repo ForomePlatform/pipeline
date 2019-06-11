@@ -26,25 +26,25 @@ This workflow uses the following tools:
 Due to the legacy pipeline code structure and the cluster configuration, there are ssome constraints on the directoris structure and storage format:
  * This workflow was created assuming that g.vcf files are split by chromosome for each sample.
  * All g.vcf files from all of priveous runs are stored under the same root directory. This root directory is passed as an input to get a list of all available g.vcf files. For example, here is the tree for the directory /data/gvcf_storage/:
- ```sh
-  |-- case01_sample1
-  |   |-- chr1.gvcf.gz
-  |   |-- chr1.gvcf.gz.tbi
-  |   |-- chr2.gvcf.gz
-  |   |-- chr2.gvcf.gz.tbi
-  |   |-- ..................
-  |   |-- chrY.gvcf.gz
-  |   |-- chrY.gvcf.gz.tbi
-  |-- case02_sample2
-  |   |-- chr1.gvcf.gz
-  |   |-- chr1.gvcf.gz.tbi
-  |   |-- chr2.gvcf.gz
-  |   |-- chr2.gvcf.gz.tbi
-  |   |-- ..................
-  |   |-- chrY.gvcf.gz
-  |   |-- chrY.gvcf.gz.tbi
-```
-   It contains 2 subdirectories with the g.vcf files for each chromosome from 2 samples. In this example, "/data/gvcf_storage/" will be passed as an input to the workflow. 
+    ```sh
+    |-- case01_sample1
+    |   |-- chr1.gvcf.gz
+    |   |-- chr1.gvcf.gz.tbi
+    |   |-- chr2.gvcf.gz
+    |   |-- chr2.gvcf.gz.tbi
+    |   |-- ..................
+    |   |-- chrY.gvcf.gz
+    |   |-- chrY.gvcf.gz.tbi
+    |-- case02_sample2
+    |   |-- chr1.gvcf.gz
+    |   |-- chr1.gvcf.gz.tbi
+    |   |-- chr2.gvcf.gz
+    |   |-- chr2.gvcf.gz.tbi
+    |   |-- ..................
+    |   |-- chrY.gvcf.gz
+    |   |-- chrY.gvcf.gz.tbi
+    ```
+    It contains 2 subdirectories with the g.vcf files for each chromosome from 2 samples. In this example, "/data/gvcf_storage/" will be passed as an input to the workflow.
  * The alligned .bam files from all of priveous runs are also stored under the same root directory. This root directory is passed as an input to get a list of all available .bam files (at the moment, this is required for the de-novo caller).
  * All executables and .jar files are stored under the same directory  
  
