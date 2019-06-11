@@ -8,7 +8,8 @@ In combination with the Forome Anfisa Variant Curation Tool, it can yield a clin
 
 This workflow uses the following tools:
 
- * [GATK4](https://software.broadinstitute.org/gatk/) 
+ * [GATK4](https://software.broadinstitute.org/gatk/)
+ * [GATK3.8](https://software.broadinstitute.org/gatk/download/archive)
  * [Samtools](http://www.htslib.org/)
  * [Sambamba](http://lomereiter.github.io/sambamba/)
  * [bcftools](https://samtools.github.io/bcftools/bcftools.html)
@@ -21,6 +22,9 @@ This workflow uses the following tools:
  * [BWA](http://bio-bwa.sourceforge.net/)
  * [NovoCaller](https://github.com/bgm-cwg/novoCaller)
  * [vcf2geno](http://csg.sph.umich.edu/chaolong/LASER/index.html)
+ * [trace](http://csg.sph.umich.edu/chaolong/LASER/index.html)
+ * [plink](https://www.cog-genomics.org/plink2)
+ * [bedtools](https://bedtools.readthedocs.io/en/latest/)
  
 
 Due to the legacy pipeline code structure and the cluster configuration, there are ssome constraints on the directoris structure and storage format:
