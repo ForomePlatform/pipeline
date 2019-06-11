@@ -17,3 +17,5 @@ This workflow uses the following tools:
  * [VEP](https://useast.ensembl.org/info/docs/tools/vep/index.html)
  * Python 2.7.9
  * [BWA](http://bio-bwa.sourceforge.net/)
+ * [NovoCaller](https://github.com/bgm-cwg/novoCaller)
+ 
