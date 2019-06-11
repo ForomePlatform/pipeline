@@ -1516,7 +1516,7 @@ task ABCaller
    String output_name
 
    command
-   {
+   <<<
       python <<CODE
       from __future__ import division
       from collections import namedtuple
@@ -1768,7 +1768,7 @@ task ABCaller
         print >> res_file, result
       res_file.close();
       CODE
-   }
+   >>>
 
    runtime
    {
