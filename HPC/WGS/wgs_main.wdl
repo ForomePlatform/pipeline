@@ -84,6 +84,7 @@ workflow wgs
     
     String gvcf_naming_pattern                                  #e.g. "g.vcf.gz"
     String path_to_split_bin                                    #path to split unix tool
+    String vep_exe                                              #path to vep executable
 
     call GenerateCaseIdsFile
     {
@@ -167,6 +168,7 @@ workflow wgs
                                         ref_ann                                                 = ref_ann,
                                         ref_pac                                                 = ref_pac,
                                         tools                                                   = tools,
+                                        vep_exe                                                 = vep_exe,
                                         directory_to_search                                     = directory_to_search, 
                                         tmp_dir                                                 = tmp_dir,
                                         chr_intervals_file                                      = chr_intervals_file,
