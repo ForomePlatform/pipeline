@@ -19,3 +19,11 @@ This workflow uses the following tools:
  * [BWA](http://bio-bwa.sourceforge.net/)
  * [NovoCaller](https://github.com/bgm-cwg/novoCaller)
  
+## Running
+
+This workflow can be run with [Cromwell](https://github.com/broadinstitute/cromwell). You can run this workflow with the following command:
+
+```sh
+java -Dconfig.file=cromwell.config -jar cromwell.jar run wgs_main.wdl --inputs inputs.json
+```
+ 
