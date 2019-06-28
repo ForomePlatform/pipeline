@@ -75,7 +75,38 @@ Due to the legacy pipeline code structure and the cluster configuration, there a
     |-- case02_sample1.bam
     |-- case02_sample1.bam.bai
     ```
- * All executables and .jar files are stored under the same directory  
+ * All executables and .jar files are stored under the same directory. This directory should be passed as "tools" input to the workflow. Here is the tree for the sample /home/tools/ directory:
+    ```sh
+    |-- bcftools
+    |-- bedtools
+    |-- bgzip
+    |-- bwa
+    |-- compound_het.out
+    |-- denovo.out
+    |-- gatk-4.1.2.0
+    |   |-- gatk
+    |   |-- gatk-completion.sh
+    |   |-- gatkcondaenv.yml
+    |   |-- GATKConfig.EXAMPLE.properties
+    |   |-- gatk-package-4.1.2.0-local.jar
+    |   |-- gatk-package-4.1.2.0-spark.jar
+    |   |-- gatkPythonPackageArchive.zip
+    |   |-- README.md
+    |-- homrec.out
+    |-- LASER-2.02
+    |   |-- laser
+    |   |-- license
+    |   |-- pileup2seq
+    |   |-- trace
+    |   |-- vcf2geno
+    |-- parallel
+    |-- plink
+    |-- pysam_prac.py
+    |-- sambamba
+    |-- samtools
+    |-- split
+    |-- tabix
+    ```
  
 ## Running
 
