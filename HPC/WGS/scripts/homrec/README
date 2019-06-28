@@ -1,0 +1,16 @@
+The relevant files are: "source.cpp", "decs_1.h", and  "tests_1.h"
+
+compile:
+g++ source.cpp
+
+
+How to run it with example:
+
+<path to compiled binary> \
+-I <path to vcf file> \
+-O <path to output file> \
+-T <path to a text file containing the ID's of the samples of the trio, separated by tabs, in the order: mother'\t'father'\t'proband> \
+-X <just put 1 here> \
+-P <threshold on posterior probability, put 0.9> \
+-E <threshold on ExAC allele frequency, put 0.001> \
+-A <Threshold on unrelated allele frequency, put 0.1>
