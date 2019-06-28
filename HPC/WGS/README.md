@@ -15,6 +15,14 @@ Downstream takes all available g.vcf files (including files from all of previous
 
 Qc report gathers metrics and produces reports and plots that are helpful in the case analysis.
 
+The overall algorithm (wgs_main.wdl) can be described as following:
+  ```sh
+  for each sample in case:
+      call upstream
+  call downstream
+  call qc-report
+  ```
+
 ### Prerequisites
 
 This workflow uses the following tools:
