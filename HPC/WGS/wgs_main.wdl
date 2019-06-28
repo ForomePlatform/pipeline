@@ -7,7 +7,7 @@ workflow wgs
     String run_id
 
     String gatk_version = "4.1.2.0"
-    String gatk_version_old = "4.1.2.0"
+    #String gatk_version_old = "4.1.2.0"
     
     String directory_to_search 
     String tmp_dir 
@@ -50,7 +50,6 @@ workflow wgs
     File ref_pac
     
     File case_fam                                               #File in the following format - https://www.cog-genomics.org/plink2/formats#fam
-    File call_gathering_py
     
     #INPUT SECTION
     Map[String, Array[Pair[File, File]]] input_fastqs           #Map that links a sample to the pair of FASTQ files
@@ -80,10 +79,11 @@ workflow wgs
 
     String novo_dir_to_search                                   #root dir to search for .bam files
     String v_env_path_activation                                #python v_env for stage2 novo_caller
-    File stub_file                                              #stub_file for select_first function
+    #File stub_file                                              #stub_file for select_first function
     
     String gvcf_naming_pattern                                  #e.g. "g.vcf.gz"
     String path_to_split_bin                                    #path to split unix tool
+    String path_to_parallel_bin 
     String vep_exe                                              #path to vep executable
 
     call GenerateCaseIdsFile
@@ -96,6 +96,10 @@ workflow wgs
     {
        input:
         fam = case_fam
+    }
+
+    call CreateStubFile
+    {
     }
 
     Int family_size = length(GetSampleIDs.sample_ids)
@@ -128,6 +132,7 @@ workflow wgs
                                         tmp_dir                          = tmp_dir,
                                         tools                            = tools,
                                         path_to_split_bin                = path_to_split_bin,
+                                        path_to_parallel_bin             = path_to_parallel_bin,
                                         gvcfs_dir                        = gvcfs_dir + "/" + base_name + key_sampleName,
                                         gatk_version                     = gatk_version
                                    }
@@ -158,7 +163,7 @@ workflow wgs
                                         novo_dir_to_search                                      = novo_dir_to_search,
                                         family_size                                             = family_size,
                                         gatk_version                                            = gatk_version,
-                                        gatk_version_old                                        = gatk_version_old,
+                                        #gatk_version_old                                        = gatk_version_old,
                                         ref_fasta                                               = ref_fasta,
                                         ref_dict                                                = ref_dict,
                                         ref_fasta_index                                         = ref_fasta_index,
@@ -187,14 +192,13 @@ workflow wgs
                                         one_thousand_genomes_vcf                                = one_thousand_genomes_vcf,
                                         one_thousand_genomes_vcf_idx                            = one_thousand_genomes_vcf_idx,
                                         case_sample_names                                       = GetSampleIDs.sample_ids,
-                                        call_gathering_py                                       = call_gathering_py,
                                         cache_path                                              = cache_path,
                                         exac_path                                               = exac_path,
                                         plugin_path                                             = plugin_path,
                                         fam                                                     = case_fam,
                                         case_ids_file                                           = GenerateCaseIdsFile.case_ids,
                                         v_env_path_activation                                   = v_env_path_activation,
-                                        stub_file                                               = stub_file,
+                                        stub_file                                               = CreateStubFile.stub,
                                         gvcf_naming_pattern                                     = gvcf_naming_pattern
                                    }
 
@@ -248,6 +252,25 @@ workflow wgs
     }
 }
 
+task CreateStubFile
+{
+   command
+   <<<
+     touch stub.txt
+   >>>
+
+   runtime
+   {
+     cpu: 1
+     memory: "100 MB"
+   }
+
+   output
+   {
+     File stub = "stub.txt"
+   }
+}
+
 task GetSampleIDs
 {
   File fam
@@ -255,7 +278,7 @@ task GetSampleIDs
   command
   <<<
       python <<CODE
-       with open("${fam}") as f:
+      with open("${fam}") as f:
         lines = f.readlines();
         for line in lines:
           if not line.startswith('#'):
