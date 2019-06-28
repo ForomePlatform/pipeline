@@ -3,7 +3,7 @@ workflow wgs_downstream
    String run_id
 
    String gatk_version
-   String gatk_version_old
+   #String gatk_version_old
    File ref_fasta
    File ref_dict       
    File ref_fasta_index
@@ -46,9 +46,7 @@ workflow wgs_downstream
    File one_thousand_genomes_vcf_idx
    
    Array[String] case_sample_names
-   
-   File call_gathering_py
-   
+      
    String cache_path
    String exac_path
    String plugin_path
@@ -149,7 +147,7 @@ workflow wgs_downstream
        mills_resource_vcf = mills_vcf,
        mills_resource_vcf_index = mills_vcf_index,
        tools = tools,
-       gatk_version = gatk_version_old,	
+       gatk_version = gatk_version,	
        cpu = 2,
        docker = "broadinstitute/gatk:latest",
        memory = "16 GB"
@@ -173,7 +171,7 @@ workflow wgs_downstream
        one_thousand_genomes_resource_vcf = one_thousand_genomes_vcf,
        one_thousand_genomes_resource_vcf_index = one_thousand_genomes_vcf_idx,
        tools = tools,
-       gatk_version = gatk_version_old,
+       gatk_version = gatk_version,
        cpu = 2,
        docker = "broadinstitute/gatk:latest",
        memory = "16 GB"
@@ -198,7 +196,7 @@ workflow wgs_downstream
        snp_filter_level   = 99.0,
    
        tools = tools,
-       gatk_version = gatk_version_old,
+       gatk_version = gatk_version,
        docker = "broadinstitute/gatk:latest",
        cpu = 1,
        memory = "16 GB"   
@@ -292,7 +290,7 @@ workflow wgs_downstream
              family_bams = family_bams,
              family_bams_idx = family_bams_idx,
              dir_to_search = novo_dir_to_search,
-             include_in_path = "wgs",
+             include_in_path = "wgs*results",
              exclude_from_path = run_id,
              cpu = 1,
              memory = "1024 MB", 
@@ -451,6 +449,7 @@ workflow wgs_downstream
           out_base_name = "final",
           out_extension = "vcf.gz",
           out_type = "z",
+          tools = tools,
           num_threads = 4,
           memory = "1 GB",
           docker = "timuris/bcftools:bgzip"
@@ -469,6 +468,7 @@ workflow wgs_downstream
           out_type = "z",
           num_threads = 4,
           memory = "1 GB",
+          tools = tools,
           docker = "timuris/bcftools:bgzip"
      }
 
@@ -774,15 +774,17 @@ task BcfToolsMergeVcf
    String out_extension
    String out_type
 
+   String tools
+
    Int num_threads
    String memory
    String docker
 
    command
    {
-      bcftools concat --threads ${num_threads} -a -D -O ${out_type} -o ${out_base_name}.${out_extension} ${sep=' ' vcfs}
+      ${tools}/bcftools concat --threads ${num_threads} -a -D -O ${out_type} -o ${out_base_name}.${out_extension} ${sep=' ' vcfs}
       if [ "${out_type}" = "z" ]; then
-         tabix -p vcf ${out_base_name}.${out_extension}
+         ${tools}/tabix -p vcf ${out_base_name}.${out_extension}
       fi 
    }
 
@@ -892,7 +894,7 @@ task ProcessHomRecRes
                int(call.group('POS')),
                call.group('REF'),
                call.group('ALT').split(','));
-       prob = float(call.group('PROB');
+       prob = float(call.group('PROB'));
        if prob > 0.5:
          call_tuple = (site, prob, 'BGM_BAYES_HOM_REC');
          listOfCalledTuples.append(call_tuple);
@@ -942,7 +944,7 @@ task ProcessBgmCompHetRes
      with open("${res}", 'r') as f:
        call_iter = CMPD_HET_CALL_PATT.finditer(f.read());
 
-     reader = pyvcf.Reader(filename=sys.argv[2]);
+     reader = pyvcf.Reader(filename="${vcf}");
      read_iter = reader.__iter__();
 
      listOfCalls = [];
@@ -950,7 +952,7 @@ task ProcessBgmCompHetRes
        listOfCalls.append(call);
 
      listOfCalls.sort(key=lambda x: int(x.group('POS')));     
-     lisOfCalledTuples = [];
+     listOfCalledTuples = [];
      
      for call in listOfCalls:
        while True:
@@ -965,7 +967,7 @@ task ProcessBgmCompHetRes
        prob = float(call.group('PROB'));
        if prob > 0.5:
          call_tuple = (site, prob, 'BGM_BAYES_CMPD_HET');
-         lisOfCalledTuples.append(call_tuple);
+         listOfCalledTuples.append(call_tuple);
      
      for call in listOfCalledTuples:
        print >> res_file, call;
@@ -1108,7 +1110,7 @@ task BgmBayesDeNovo_stage2
       fi;
       ${v_env_path_activation}
       echo -e ' ${sep='\n' family_bams}' > case.bams
-      find ${dir_to_search} -type f -name "*bam" -path "${include_in_path}" -not -path "${exclude_from_path}" > allBams.txt
+      find ${dir_to_search} -type f -name "*hg19.bam" -path "*${include_in_path}*" -not -path "*${exclude_from_path}*" > allBams.txt
       python ${script} -I ${st1_res} -U allBams.txt -T case.bams -O ${chr}.st2.res
    >>>
    
@@ -1270,6 +1272,41 @@ task SplitVcfByChr
       File vcf_idx = "${chr}.vcf.gz.tbi"
    }
 }
+
+#task VepAnnotate
+#{
+#   String cache_path
+#   String exac_path
+#   String plugin_path
+#   File input_vcf
+#   File input_vcf_index
+#   String output_basename
+#   Int number_of_threads
+#   Int buffer
+#   String memory
+#   String vep_exe
+#   
+#   command
+#   {
+#      ${vep_exe} --merged --format vcf --force_overwrite --dir_cache ${cache_path} --dir_plugin ${plugin_path} --offline --no_stats --vcf --everything \
+#          --plugin ExAC,${exac_path} --allele_number --input_file ${input_vcf} --output_file ${output_basename}.vcf.gz --compress_output bgzip --fork ${number_of_threads} \
+#          --buffer_size ${buffer} --use_given_ref
+#   }
+#
+#   runtime
+#   {
+#     memory: memory
+#     cpu: number_of_threads
+#     docker: "timuris/vep"
+#   }
+#
+#   output
+#   {
+#     File out_vcf = "${output_basename}.vcf.gz"
+#     File out_vcf_index = "${output_basename}.vcf.gz.tbi"
+#   }
+#
+#}
 
 task VepAnnotate
 {
