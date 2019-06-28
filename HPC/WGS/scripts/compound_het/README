@@ -1,0 +1,13 @@
+compile it by suing:
+g++ source.cpp
+
+run it for calling:
+./a.out \
+-I <path to vcf file with vep annotations> \
+-TR <text file containing ID's of the trio in order of parent1<TAB>parent2<TAB>child > \
+-O <output file> \
+-T <probability threshold, put 0.9> \
+-E <ExAC allele frequency threshold, put 0.001> \
+-A <unrelated samples allele frequency threshold, put 0.01>
+
+the argument -TR is simply a text file containing one line with the ID's of the samples of the trio separated by TAB\
