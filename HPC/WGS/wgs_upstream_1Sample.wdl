@@ -50,6 +50,7 @@ workflow wgs_upstream
 
       String tmp_dir 
       String path_to_split_bin
+      String path_to_parallel_bin
 
       call CreateSequenceGroupingTSV
       {
@@ -70,23 +71,25 @@ workflow wgs_upstream
          call SplitFQ_parallel as SplitFQ1
          {
             input:
-              fq                = fq_pair.left,
-	      path_to_split_bin = path_to_split_bin,
-              suffix            = "1",
-              case_name         = base_name + sampleName + "_" + index,
-              cpu               = 4,
-              memory            = "1 GB"
+              fq                   = fq_pair.left,
+	      path_to_split_bin    = path_to_split_bin,
+              path_to_parallel_bin = path_to_parallel_bin,
+              suffix               = "1",
+              case_name            = base_name + sampleName + "_" + index,
+              cpu                  = 4,
+              memory               = "1 GB"
          }
 
          call SplitFQ_parallel as SplitFQ2
          {
             input:
-              fq                = fq_pair.right,
-	      path_to_split_bin = path_to_split_bin,
-              suffix            = "2",
-              case_name         = base_name + sampleName + "_" + index,
-              cpu               = 4,
-              memory            = "1 GB"
+              fq                   = fq_pair.right,
+	      path_to_split_bin    = path_to_split_bin,
+              path_to_parallel_bin = path_to_parallel_bin,
+              suffix               = "2",
+              case_name            = base_name + sampleName + "_" + index,
+              cpu                  = 4,
+              memory               = "1 GB"
          }
       }
 
@@ -131,7 +134,8 @@ workflow wgs_upstream
 	       compressionLvl      = 5,
 	       cpus                = 8,
 	       sambamba            = tools + "/sambamba",
-	       flag                = "-n"
+               tmp_dir             = tmp_dir,
+	       flag                = "--sort-picard"
 	  }
 	  
 	  call BwaMem
@@ -150,7 +154,7 @@ workflow wgs_upstream
 	       ref_ann              = ref_ann,
 	       ref_pac              = ref_pac,
 	       cpu                  = bwa_threads,
-	       memory               = "16 GB",
+	       memory               = "2 GB",
 	       tools                = tools
 	  }
 	  
@@ -176,7 +180,7 @@ workflow wgs_upstream
                tmp_dir             = tmp_dir
 	  }
 	  
-          # Should sort anyway?
+          #Should sort anyway?
           #call SortSam_byQuery as MergeAlignmentSort
           #{
           #   input:
@@ -185,7 +189,8 @@ workflow wgs_upstream
           #     compressionLvl      = 5,
           #     cpus                = 8,
           #     sambamba            = tools + "/sambamba",
-          #     flag                = "-n"
+          #     tmp_dir             = tmp_dir,
+          #     flag                = "--sort-picard"
           #}	  
       }
 
@@ -193,6 +198,8 @@ workflow wgs_upstream
       {
          input:
            input_bams           = MergeBamAlignment.output_bam,
+           #input_bams           = MergeAlignmentSort.output_bam,
+           #input_bais           = MergeAlignmentSort.output_bam_index,
            output_bam_basename  = base_name + "." + sampleName + ".aligned.unsorted.duplicates_marked",
            metrics_filename     = "duplicate_metrics",
            tools                = tools,
@@ -212,6 +219,7 @@ workflow wgs_upstream
            compressionLvl      = 5,
            cpus                = 8,
            sambamba            = tools + "/sambamba",
+           tmp_dir             = tmp_dir,
            flag                = ""
       }
 
@@ -505,7 +513,7 @@ task GetBwaVersion
   {
     # Not setting "set -o pipefail" here because /bwa has a rc=1 and we don't want to allow rc=1 to succeed 
     # because the sed may also fail with that error and that is something we actually want to fail on.
-    ${tools}/bwa/bwa-0.7.17/bwa 2>&1 | \
+    ${tools}/bwa 2>&1 | \
     grep -e '^Version' | \
     sed 's/Version: //'
   }
@@ -552,7 +560,7 @@ task BwaMem
     bash_ref_fasta=${ref_fasta}
     bwa_threads=${cpu}
     
-    ${tools}/bwa/bwa-0.7.17/${bwa_commandline} ${fastq1} ${fastq2} | \
+    ${tools}/${bwa_commandline} ${fastq1} ${fastq2} | \
     ${tools}/samtools view -1 -@ ${cpu} - > ${output_bam_basename}.bam 2>> bwa_err.log
   }
 
@@ -578,10 +586,11 @@ task SortSam_byQuery
   Int cpus
   String flag
   String sambamba
+  String tmp_dir
 
   command
   {
-     ${sambamba} sort -m 8G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
+     ${sambamba} sort --tmpdir=${tmp_dir} -m 64G -o ${output_bam_basename}.bam ${flag} -l ${compressionLvl} -t ${cpus} ${input_bam}
      ${sambamba} index ${output_bam_basename}.bam
   }
 
@@ -674,7 +683,7 @@ task MergeBamAlignment
 task MarkDuplicatesSpark
 {
    Array[File] input_bams
-   #Array[File] input_bams_inds
+   #Array[File] input_bais
    String output_bam_basename
    String metrics_filename
    String tools
@@ -962,6 +971,7 @@ task SplitFQ_parallel
   String suffix
 
   String path_to_split_bin
+  String path_to_parallel_bin
 
   Int cpu
   String memory
@@ -970,7 +980,7 @@ task SplitFQ_parallel
   <<<
      set -e
      zcat ${fq} | ${path_to_split_bin} --additional-suffix=.fq${suffix} -l 60000000 - ${case_name}
-     parallel -j${cpu} gzip ::: *.fq${suffix}
+     ${path_to_parallel_bin} -j${cpu} gzip ::: *.fq${suffix}
   >>>
 
   runtime
