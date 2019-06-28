@@ -13,7 +13,6 @@
 #include<algorithm>
 #include<boost/math/special_functions/gamma.hpp>
 #include"decs_1.h"
-#include"tests_1.h"
 
 
 // monty
