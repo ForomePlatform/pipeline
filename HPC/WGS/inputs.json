@@ -1,0 +1,83 @@
+{
+ "wgs.run_id"                      : "case_id",
+ "wgs.tools"                       : "/path/to/tools/",
+ "wgs.bwa_threads"                 : "16",
+ "wgs.samtools_threads"            : "16",
+
+ "wgs.dbSNP_vcf"                   : "/path/to/dbsnp_147.hg19.vcf",
+ "wgs.dbSNP_vcf_idx"               : "/path/to/dbsnp_147.hg19.vcf.idx",
+ "wgs.known_indels_sites_VCF"      : "/path/to/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf",
+ "wgs.known_indels_sites_idx"      : "/path/to/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.idx",
+ "wgs.hapmap_vcf"                  : "/path/to/hapmap_3.3.hg19.sites.vcf",
+ "wgs.hapmap_vcf_idx"              : "/path/to/hapmap_3.3.hg19.sites.vcf.idx",
+ "wgs.one_thousand_genomes_vcf"    : "/path/to/1000G_phase1.indels.hg19.vcf",
+ "wgs.one_thousand_genomes_vcf_idx": "/path/to/1000G_phase1.indels.hg19.vcf.idx",
+ "wgs.omni_vcf"                    : "/path/to/1000G_omni2.5.hg19.sites.vcf",
+ "wgs.omni_vcf_idx"                : "/path/to/1000G_omni2.5.hg19.sites.vcf.idx",
+ "wgs.ref_fasta"                   : "/path/to/hg19.fasta",
+ "wgs.ref_dict"                    : "/path/to/hg19.dict",
+ "wgs.ref_fasta_index"             : "/path/to/hg19.fasta.fai",
+ "wgs.ref_bwt"                     : "/path/to/hg19.fasta.bwt",
+ "wgs.ref_sa"                      : "/path/to/hg19.fasta.sa",
+ "wgs.ref_amb"                     : "/path/to/hg19.fasta.amb",
+ "wgs.ref_ann"                     : "/path/to/hg19.fasta.ann",
+ "wgs.ref_pac"                     : "/path/to/hg19.fasta.pac",
+ "wgs.gvcfs_dir"                   : "/path/to/gvcf/dir/",
+ "wgs.directory_to_search"         : "/path/to/search/dir/",
+ "wgs.tmp_dir"                     : "/tmp_dir/",
+ "wgs.novo_dir_to_search"          : "/path/to/dir/with/bams",
+
+ "wgs.gatk_version"                : "4.1.2.0",
+ "wgs.v_env_path_activation"       : ". /venv/bin/activate",
+ "wgs.gvcf_naming_pattern"         : "gvcf.gz",
+ "wgs.vep_exe"                     : "/path/to/variant_effect_predictor.pl",
+ "wgs.path_to_split_bin"           : "/path/to/split",
+ "wgs.path_to_parallel_bin"        : "/path/to/parallel",
+
+ "wgs.scattered_calling_intervals_list": "/path/to/scatter_intervals",
+ "wgs.chr_intervals_file"              : "/path/to/variant_caller_intervals.file",
+
+ "wgs.cache_path"                  : "/path/to/vep-85-cache/",
+ "wgs.exac_path"                   : "/path/to/ExAC.r1.sites.vep.vcf.gz",
+ "wgs.plugin_path"                 : "/path/to/vep-85/plugins/",
+
+ "wgs.case_fam"                    : "/path/to/case.fam",
+
+ "wgs.bedtools_bin"                : "/path/to/bin/bedtools",
+ "wgs.clinical_bed"                : "/path/to/clinical.v2.bed",
+ "wgs.genome_coverage"             : "/path/to/coverage_genome.hg19.txt",
+ "wgs.exons"                       : "/path/to/exons.hg19.bed",
+ "wgs.plink_bin"                   : "/path/to/plink",
+ "wgs.exome_ranges"                : "/path/to/trace/HGDP/hg19_ranges_exome.txt",
+ "wgs.vcf2geno"                    : "/path/to/LASER-2.02/vcf2geno/vcf2geno",
+ "wgs.trace"                       : "/path/to/LASER-2.02/trace",
+ "wgs.hgdp_geno"                   : "/path/to/trace/HGDP/HGDP_938_exome.geno",
+ "wgs.hgdp_coord"                  : "/path/to/trace/HGDP/HGDP_938_exome.RefPC.coord",
+ "wgs.hgdp_coords"                 : "/path/to/trace/HGDP/HGDP_continental_coords_exome.txt",
+ "wgs.make_PCA_plot_script"        : "/path/to/make_PCA_plot.R",
+ "wgs.report_script"               : "/path/to/qc.py",
+ "wgs.gatk_launch_3_8"             : "/path/to/gatk3.8/GenomeAnalysisTK-3.8-1-0-gf15c1c3ef/GenomeAnalysisTK.jar",
+
+ "wgs.input_fastqs": { "a1": [
+                                         {
+                                            "Left" : "/path/to/P_R1.fastq.gz",
+                                            "Right": "/path/to/P_R2.fastq.gz"
+                                         }
+                             ],
+ 
+                       "u1": [
+                                         {
+                                            "Left" : "/path/to/M_R1.fastq.gz",
+                                            "Right": "/path/to/M_R2.fastq.gz"
+                                         }
+                             ],
+
+                       "u2": [
+                                         {
+                                            "Left" : "/path/to/D_R1.fastq.gz",
+                                            "Right": "/path/to/D_R2.fastq.gz"
+                                         }
+                             ]
+                     },
+ "wgs.base_name"        : "case_basename"
+}
