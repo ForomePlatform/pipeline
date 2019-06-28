@@ -4,6 +4,17 @@
 This is a portable workflow for converting the raw sequencing data in FASTQ format to results usable in a clinical environment. 
 In combination with the Forome Anfisa Variant Curation Tool, it can yield a clinically actionable report.
 
+This workflow consists of 3 main components:
+  * Upstream
+  * Downstream
+  * QC report
+
+Upstream takes the raw .fastq files as an input and produces the aligned .bam files (by utilizing BWA) and g.vcf files. This component follows the GATk Best Practices.
+
+Downstream takes all available g.vcf files (including files from all of previous runs), performs Genotyping and applies set of custom callers on the produced vcf. This component outputs a .vcf file that is ready to be upload in the curation tool.
+
+Qc report gathers metrics and produces reports and plots that are helpful in the case analysis.
+
 ### Prerequisites
 
 This workflow uses the following tools:
