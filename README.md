@@ -1,2 +1,6 @@
 # pipeline
 Pipeline WDL Workflows
+
+WGS/HPC contains the implementation and detailed to run on the local cluster system.
+
+WGS/fromFASTQs contains the implementation to run on the AWS
